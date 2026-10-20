@@ -41,11 +41,24 @@ growth/decay of rain cells.
 - Loss: binary cross-entropy with positive weight 8 (rain is rare) plus a soft FSS loss, which is the
   metric itself computed on probabilities instead of binary masks, so the network optimises what is
   scored.
-- Optimiser AdamW, one-cycle learning rate schedule, batch 32.
-- Validation each epoch; the checkpoint with the best FSS is kept. Thresholds are then tuned per lead
-  time on the validation probabilities.
-- For the final submission the same recipe is retrained on all seasons including December 2023, the
-  closest data to the test period, and several seeds are averaged before thresholding.
+- Optimiser AdamW (learning rate 5e-4, weight decay 1e-4), one-cycle learning rate schedule, batch 32,
+  6 epochs.
+- Regularisation: dropout 0.2 before the output layer and random translations of up to 16 pixels.
+  Rotations and flips were tried and hurt, because rain over Madagascar mostly moves in one direction
+  and a rotated map teaches the network wrong motion.
+- Input upscaling (best single change so far, about +0.012 FSS on validation): the 8-channel input is
+  bilinearly enlarged from 128x128 to 256x256 before the encoder, and the 3 output maps are averaged
+  back down to 128x128. A ResNet shrinks its input 32 times, so a 128-pixel map becomes a 4x4 grid at
+  the bottom of the U-Net; at 256 pixels the grid is 8x8 and the first layers see rain cells that span
+  more pixels, closer to the object sizes the ImageNet weights were trained on.
+- Epoch averaging: the test probabilities of the last 5 epochs are averaged, which beats the single
+  best checkpoint by about +0.004 because each epoch makes slightly different mistakes.
+- Thresholds are tuned per lead time on the held-out season (Dec 2022 to Mar 2023), from the averaged
+  probabilities.
+- For the final submissions the same recipe is retrained on all seasons including December 2023, the
+  closest data to the test period, with the thresholds from the matching validation run. Several
+  seeds and recipes are averaged before thresholding. Training on all seasons was worth about +0.009 on
+  the public leaderboard for a single model.
 
 ## What was tried and rejected
 

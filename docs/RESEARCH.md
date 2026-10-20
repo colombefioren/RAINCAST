@@ -16,6 +16,8 @@ or `src/blend.py`; the journal records whether they helped on validation.
 | 8 | Keep direct 3-channel output rather than autoregressive rollout or lead conditioning | WeatherFusionNet, SmaAt-UNet, RainAI ablations. | already the design |
 | 9 | Architecture swaps (Earthformer, 3D U-Net) | Gains reported only with 13+ input frames and MSE regression; with 3 frames 2D U-Nets won Weather4cast 2023. | skipped |
 | 10 | Focal loss, Fourier losses, flip test-time augmentation | Focal helps only heavy rain; flips contradict the anisotropy seen in training. | skipped |
+| 11 | Upscale the input 2x before a pretrained encoder, pool the output back | Own experiment (`--upscale 2`), motivated by the 4x4 bottleneck a ResNet produces on 128-pixel maps. | done: best single recipe, validation 0.6996 single, 0.7032 last-5 average; 3x being tested |
+| 12 | Translation test-time augmentation: predict on shifted copies, shift back, average | Matches the translation augmentation used in training, unlike flips (row 10). | being measured with `src/eval_tta.py` |
 
 Checks on the current setup from the same review: the soft FSS loss must pool numerator and
 denominator over the whole batch (it does); the BCE positive weight of 8 combined with FSS loss and
