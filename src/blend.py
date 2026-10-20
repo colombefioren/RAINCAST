@@ -12,8 +12,14 @@ p.add_argument("--weights", default="", help="comma-separated blend weights, def
 p.add_argument("probs", nargs="+")
 a = p.parse_args()
 
-tr = np.load(f"{a.data}/train.npz"); ts = pd.to_datetime(tr["times"])
-val = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")); yv = tr["y"][val]
+import os
+YV = f"{a.data}/yval.npy"  # cached validation targets (Dec 2022 - Mar 2023), avoids reloading 4 GB each time
+if os.path.exists(YV):
+    yv = np.load(YV)
+else:
+    tr = np.load(f"{a.data}/train.npz"); ts = pd.to_datetime(tr["times"])
+    val = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")); yv = (tr["y"][val] > 1.0).astype(np.float16) * 10
+    np.save(YV, yv)
 w = np.array([float(x) for x in a.weights.split(",")]) if a.weights else np.ones(len(a.probs))
 w = w / w.sum()
 for f in a.probs:
