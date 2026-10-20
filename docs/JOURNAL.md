@@ -29,7 +29,7 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | loss recipe trained on all seasons, 6 epochs (`indabax-unet-r34-loss-full-s102`) | no validation possible | | second full-data model; test probabilities kept per epoch for blending |
 | 2026-10-20 | 8-run blend, upscale run weighted 3 | 0.7012 | not submitted | old runs drag the upscale run down |
 | 2026-10-20 | shift last3 + loss last5 + upscale last5, weights 1:1:4 / 1:1:8 | 0.7037 / 0.7039 | not submitted | barely above the upscale run alone (0.7032): the older recipes add almost nothing now, so more upscale-style models are the way forward |
-| 2026-10-20 | full-data shift s101 last3 + full-data loss s102 last5, thresholds 0.525/0.475/0.45 from the matching validation pair (0.6957) | no validation possible | pending | submission 5: checks whether blending two full-data models carries to the public leaderboard before the final full-data upscale ensemble |
+| 2026-10-20 | full-data shift s101 last3 + full-data loss s102 last5, thresholds 0.525/0.475/0.45 from the matching validation pair (0.6957) | no validation possible | 0.70517 (new best) | submission 5: checks whether blending two full-data models carries to the public leaderboard before the final full-data upscale ensemble |
 | 2026-10-20 | up2 recipe on all seasons, 6 epochs, seed 103 (`indabax-unet-r34-up2-full-s103`) | no validation possible | | full-data version of the best recipe |
 | 2026-10-20 | resnet34, translation aug, 3x input upscaling, seed 32 (`indabax-unet-r34-up3`) | running | | does more upscaling keep helping? |
 
@@ -37,7 +37,7 @@ Kaggle kernel naming: the first three kernels are `indabax-rain-unet`, `indabax-
 
 Submission policy from 2026-10-20 evening (Colombe's decision): submit when the submission either predicts a public score above the current leader or gives information that helps get there (checking that a validation gain carries to the leaderboard). Offset validation to public so far: +0.010.
 
-Reading of submission 4 (full-data single model, 0.70337): a single model of the same recipe trained on validation seasons only scored 0.69473, so training on every season is worth about +0.009 on the public leaderboard. The 4-run validated blend (0.70364) still edges it. The plan is therefore: full-data versions of the best recipes, blended, with thresholds taken from the matching validation runs.
+Reading of submissions 4 and 5 (corrected): the full-data shift model (0.70337) should be compared with the same recipe trained without the validation season (validation 0.691, so about 0.701 expected on the public board), not with run 1. Full-data training is therefore worth only about +0.002. Submission 5 confirms it: the matching validation pair scored 0.6957, which predicts about 0.7057, and the full-data pair scored 0.70517. Conclusion: retraining on all seasons is safe but is not where the missing points are. The validation offset of +0.010 still holds.
 
 ## Submissions used per day (limit 5)
 
