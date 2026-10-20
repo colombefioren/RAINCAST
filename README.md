@@ -18,6 +18,7 @@ at t+1h, t+2h and t+3h. Evaluated with the Fractions Skill Score (FSS) at a 1 mm
 | `docs/APPROACH.md` | Why the model is built this way, in plain words. |
 | `docs/JOURNAL.md` | Experiment log: every run, its validation score and leaderboard score. |
 | `docs/RULES.md` | Competition rules that constrain the work, and how the code respects them. |
+| `docs/RESEARCH.md` | Literature review of techniques for this task, ranked, with what was implemented. |
 | `docs/HANDBOOK.md` | Machine learning, Kaggle and this project explained for the participant, with talking points for verification. |
 | `data/` | Competition files (git-ignored): `train.npz`, `test.npz`, `sample_submission.csv`. |
 | `outputs/` | Model weights, probability maps, submissions (git-ignored). |

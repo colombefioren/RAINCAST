@@ -8,6 +8,7 @@ from fss import fss_pooled, report
 p = argparse.ArgumentParser()
 p.add_argument("--data", required=True); p.add_argument("--out", required=True)
 p.add_argument("--smooth", type=int, default=0, help="average probabilities over k x k window before thresholding")
+p.add_argument("--dilate", type=int, default=0, help="1: also sweep a 3x3 dilation per lead")
 p.add_argument("--weights", default="", help="comma-separated blend weights, default equal")
 p.add_argument("probs", nargs="+")
 a = p.parse_args()
@@ -37,7 +38,23 @@ for k in range(3):
     print(f"lead {k+1}: thr {thr[-1]:.3f} fss {best[-1]:.4f}")
 pred = np.stack([(PV[:, k] > thr[k]) * 10.0 for k in range(3)], 1)
 score = report("blend tuned", pred, yv)
-json.dump({"thr": thr, "val_fss": score, "per_lead": best, "probs": a.probs, "weights": w.tolist(), "smooth": a.smooth},
+from scipy.ndimage import maximum_filter
+dil = [1, 1, 1]
+if a.dilate:
+    # per lead: re-tune threshold jointly with a k x k max-pool dilation of the binary mask
+    for k in range(3):
+        best_s, best_t, best_d = -1, thr[k], 1
+        for d in (1, 3):
+            for t in np.arange(0.3, 0.9, 0.025):
+                m = (PV[:, k] > t).astype(np.float32)
+                if d > 1: m = maximum_filter(m, size=(1, d, d))
+                sc = fss_pooled(m[:, None] * 10.0, yv[:, k:k+1])[0]
+                if sc > best_s: best_s, best_t, best_d = sc, float(t), d
+        thr[k], dil[k] = best_t, best_d
+        print(f"lead {k+1}: dilate {best_d} thr {best_t:.3f} fss {best_s:.4f}")
+    pred = np.stack([maximum_filter((PV[:, k] > thr[k]).astype(np.float32), size=(1, dil[k], dil[k])) * 10.0 if dil[k] > 1 else (PV[:, k] > thr[k]) * 10.0 for k in range(3)], 1)
+    score = report("blend tuned+dilate", pred, yv)
+json.dump({"thr": thr, "dilate": dil, "val_fss": score, "per_lead": best, "probs": a.probs, "weights": w.tolist(), "smooth": a.smooth},
           open(a.out, "w"), indent=1)
 np.save(a.out.replace(".json", "_testprob.npy"), PT.astype(np.float32))
 print("saved", a.out, "and blended test probs")
