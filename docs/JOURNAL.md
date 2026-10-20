@@ -17,7 +17,9 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | resnet34, 5 epochs, lr 5e-4, no aug, dropout 0.2 (`indabax-unet-r34-dropout`) | 0.678 single, 0.686 last-4-epoch average | | dropout alone removes the overfitting; peak now at epoch 4 |
 | 2026-10-20 | blend of run 1 + r34-advect last4 + r34-dropout last4 + kernel v2 epoch 6 | 0.694 (thr 0.575/0.55/0.55) | 0.70364 | +0.009 over best single |
 | 2026-10-20 | 4-run blend + 3x3 or 5x5 probability smoothing before threshold | 0.692 / 0.688 | | smoothing hurts, dropped |
-| 2026-10-20 | resnet34, translation aug, dropout, advection, 6 epochs (`indabax-unet-r34-shift`) | running | | tests the motion-preserving augmentation |
+| 2026-10-20 | resnet34, translation aug, dropout, advection, 6 epochs (`indabax-unet-r34-shift`) | 0.686 single, 0.691 last-2 average | | best single recipe so far; translation augmentation gives about +0.003 |
+| 2026-10-20 | 5-run blend (adds efficientnet-b3) | 0.695 | not submitted | +0.001, within noise |
+| 2026-10-20 | resnet34, translation aug, 2x input upscaling (`indabax-unet-r34-up2`) | running | | pretrained encoder sees finer structure |
 | 2026-10-20 | efficientnet-b3, translation aug, dropout, advection, 6 epochs (`indabax-unet-effb3-shift`) | 0.684 single, 0.687 last-4 average | | same plateau as resnet34; useful as blend diversity |
 | 2026-10-20 | 4-run blend + per-lead 3x3 dilation sweep | 0.694 | | dilation never selected, no gain |
 | 2026-10-20 | resnet34, soft CSI + multi-scale FSS loss, pos_w 2, mixup 0.5, wet sampling, translation aug (`indabax-unet-r34-loss`) | running | | literature-backed loss and sampling changes, see docs/RESEARCH.md |
