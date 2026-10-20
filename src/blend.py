@@ -17,9 +17,9 @@ val = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")); yv = tr["y"][val]
 w = np.array([float(x) for x in a.weights.split(",")]) if a.weights else np.ones(len(a.probs))
 w = w / w.sum()
 for f in a.probs:
-    pv = np.load(f); report(f.split("/")[-1][:28], (pv > 0.5) * 10.0, yv)
-PV = sum(wi * np.load(f) for wi, f in zip(w, a.probs))
-PT = sum(wi * np.load(f.replace("_valprob", "_testprob")) for wi, f in zip(w, a.probs))
+    pv = np.load(f).astype(np.float32); report(f.split("/")[-1][:28], (pv > 0.5) * 10.0, yv)
+PV = sum(wi * np.load(f).astype(np.float32) for wi, f in zip(w, a.probs))
+PT = sum(wi * np.load(f.replace("_valprob", "_testprob")).astype(np.float32) for wi, f in zip(w, a.probs))
 if a.smooth > 1:
     PV = uniform_filter(PV, size=(1, 1, a.smooth, a.smooth), mode="nearest")
     PT = uniform_filter(PT, size=(1, 1, a.smooth, a.smooth), mode="nearest")

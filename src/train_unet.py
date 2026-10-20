@@ -106,7 +106,7 @@ def tune_thresholds(prob, obs):
 
 import os; os.makedirs(a.out, exist_ok=True)
 tag = f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
-best_score, hist = -1, []
+best_score, hist, VAL_EPOCHS = -1, [], []
 for ep in range(a.epochs):
     model.train(); t0 = time.time(); tl = 0
     for i, (xb, yb) in enumerate(dl_tr):
@@ -122,21 +122,31 @@ for ep in range(a.epochs):
         msg += f" val_fss@0.5 {s05:.4f} @0.3 {s03:.4f}"
         score = max(s05, s03)
         if score > best_score:
-            best_score = score; torch.save(model.state_dict(), f"{a.out}/{tag}.pt"); np.save(f"{a.out}/{tag}_valprob.npy", pv)
+            best_score = score; torch.save(model.state_dict(), f"{a.out}/{tag}.pt"); np.save(f"{a.out}/{tag}_valprob.npy", pv.astype(np.float16))
     else:
         torch.save(model.state_dict(), f"{a.out}/{tag}.pt")
     print(msg, flush=True); hist.append(msg)
     if a.save_each:
-        np.save(f"{a.out}/{tag}_ep{ep}_testprob.npy", predict(dl_te))
-        if dl_va is not None: np.save(f"{a.out}/{tag}_ep{ep}_valprob.npy", pv)
+        np.save(f"{a.out}/{tag}_ep{ep}_testprob.npy", predict(dl_te).astype(np.float16))
+        if dl_va is not None: VAL_EPOCHS.append(pv.astype(np.float16))
 
 if dl_va is not None:
     model.load_state_dict(torch.load(f"{a.out}/{tag}.pt"))
-    pv = np.load(f"{a.out}/{tag}_valprob.npy"); yv = y[val]
+    pv = np.load(f"{a.out}/{tag}_valprob.npy").astype(np.float32); yv = y[val]
     print("tuning thresholds on validation", flush=True)
     thr = tune_thresholds(pv, yv)
     pred = np.stack([(pv[:, k] > thr[k]) * 10.0 for k in range(3)], 1)
     report("unet tuned", pred, yv)
-    json.dump({"thr": thr, "best_val": best_score, "hist": hist}, open(f"{a.out}/{tag}.json", "w"), indent=1)
-pt = predict(dl_te); np.save(f"{a.out}/{tag}_testprob.npy", pt)
+    epoch_blends = {}
+    if a.save_each and len(VAL_EPOCHS) > 1:
+        # blends of the last k epochs: tells which epochs to average for the test prediction
+        for k in range(2, len(VAL_EPOCHS) + 1):
+            pb = np.mean([v.astype(np.float32) for v in VAL_EPOCHS[-k:]], axis=0)
+            print(f"blend of last {k} epochs", flush=True)
+            tk = tune_thresholds(pb, yv)
+            sc = report(f"  last{k} tuned", np.stack([(pb[:, j] > tk[j]) * 10.0 for j in range(3)], 1), yv)
+            epoch_blends[f"last{k}"] = {"thr": tk, "val_fss": sc, "epochs": list(range(len(VAL_EPOCHS) - k, len(VAL_EPOCHS)))}
+            np.save(f"{a.out}/{tag}_last{k}_valprob.npy", pb.astype(np.float16))
+    json.dump({"thr": thr, "best_val": best_score, "hist": hist, "epoch_blends": epoch_blends}, open(f"{a.out}/{tag}.json", "w"), indent=1)
+pt = predict(dl_te); np.save(f"{a.out}/{tag}_testprob.npy", pt.astype(np.float16))
 print("saved test probs", pt.shape, flush=True)
