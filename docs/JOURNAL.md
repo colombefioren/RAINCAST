@@ -47,7 +47,10 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-21 | resnet34, 3x upscale, TTA, second seed (`indabax-unet-r34-up3-s35`) | 0.7024 single, 0.7066 last-4 average | | seed spread about 0.0015 |
 | 2026-10-21 | blend of up3 s32, up3 s35, up4, up2, r50-up2, equal weights, thresholds | 0.7108 | | best thresholded blend |
 | 2026-10-21 | same five-model blend, decoded (`outputs/blend15dec.json`, mu 0.425/0.375/0.35) | 0.7641 (in-sample calibration) | ready as `sub08` | predicted public about 0.774; candidate for the first submission of 21 October |
-| 2026-10-21 | resnet50 3x and multi-scale-loss 3x kernels (`indabax-unet-r50-up3`, `indabax-unet-r34-up3-loss`) | running | | diversity for the ensemble |
+| 2026-10-21 | resnet34, 3x upscale, multi-scale FSS + soft CSI loss, pos_w 2, mixup, wet sampling, TTA (`indabax-unet-r34-up3-loss`) | 0.6949 single, 0.7060 last-6 average | | same level, different errors: useful for the blend |
+| 2026-10-21 | five-model blend weighted 2:2:1:1:1 (3x runs doubled), decoded with fixed mu | 0.7641 | | same as equal weights |
+| 2026-10-21 | six-model blend (adds up3-loss), equal weights, decoded with fixed mu (`outputs/blend16dec.json`) | 0.7644 | ready as `sub09` | ensembling is close to its ceiling: +0.0003 for the sixth model |
+| 2026-10-21 | resnet50 3x and efficientnet-b3 3x kernels (`indabax-unet-r50-up3`, `indabax-unet-effb3-up3`) | running | | architecture diversity |
 
 From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
