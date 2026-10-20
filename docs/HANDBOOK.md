@@ -160,13 +160,18 @@ reproduce their result from code.
    maps, latitude, longitude, hour of day as sin and cos, day in season), optional 3 advected maps,
    3 output probability maps. Loss = weighted binary cross-entropy + a soft version of FSS computed on
    probabilities, so the network trains on something close to the metric.
-6. **Regularise**: the first run overfitted after one epoch. Added flips and 90 degree rotations,
-   dropout, lower learning rate, fewer epochs.
-7. **Blend** (`src/blend.py`): average probability maps from several runs, seeds and epochs, then pick
-   the threshold per lead time that maximises validation FSS.
-8. **Submit** (`src/make_submission.py`), log every run in `docs/JOURNAL.md`.
-9. **Final**: retrain the best recipe on all seasons including December 2023, blend seeds, select two
-   final submissions by validation score.
+6. **Regularise**: the first run overfitted after one epoch. Dropout, a lower learning rate, random
+   translations of the maps and averaging the last epochs fixed it. Flips and 90 degree rotations were
+   tried and hurt, because rain over Madagascar mostly moves in one direction.
+7. **Upscale the input 2x** before the encoder and average the output back down: the pretrained
+   encoder then sees rain cells at a size closer to the objects it learned on ImageNet. Best single
+   change to the network (+0.012 on validation).
+8. **Blend** (`src/blend.py`): average probability maps from several runs, seeds and epochs.
+9. **Decode** (`src/fss_decode.py`): turn the probabilities into the rain mask that maximises the
+   expected FSS, instead of one threshold per lead time. Biggest single gain of the project (about
+   +0.05 on held-out data). See the question "How do you turn probabilities into the final map?" below.
+10. **Submit** (`src/make_submission.py`), log every run in `docs/JOURNAL.md`.
+11. **Final**: select two final submissions by validation score.
 
 ## 6. Explaining the work in your own words
 
@@ -187,6 +192,23 @@ tuned threshold directly targets the metric.
 **How did you validate?** Held out the full December 2022 to March 2023 season. Random splits would
 leak because consecutive samples overlap by two hours. The validation score (0.685) tracked the public
 leaderboard (0.695).
+
+**How do you turn probabilities into the final map?** Not with a single threshold. FSS compares the
+fraction of rainy pixels in each 3x3 window of the forecast with the same fraction in the observation.
+Where the model is unsure, say 40 % chance of rain over a wide area, a 0.5 threshold predicts all dry
+and loses every window where rain does fall. The decoder instead picks rain pixels so that the forecast
+fraction in each window matches the fraction the model expects to be observed: solid rain where the
+model is confident, a speckled pattern where it is unsure. Formally it maximises the expected FSS. The
+expected numerator is linear in the mask, the denominator penalises clustered masks, and the best mask
+is found by iterated conditional modes (switch each pixel on or off if that raises the objective, until
+nothing changes). The probabilities are first calibrated with isotonic regression on the validation
+season, so that "0.4" really means rain 40 % of the time. On held-out weeks the gain is about +0.05.
+
+**Isn't that gaming the metric?** It is decision theory: choose the output that maximises the expected
+score given your probabilities, which is also why everyone tunes thresholds. It uses only that sample's
+own predicted probabilities, never another test sample or any test target. It is fair to add that FSS
+rewards the right amount of rain in each neighbourhood more than the exact pixel, so a speckled map
+scores well but looks less natural; an operational service should publish the probability map itself.
 
 **What was the hardest problem?** Overfitting. Ten thousand hourly samples are highly correlated, so a
 24 million parameter network memorised them after one epoch. Augmentation, dropout, a lower learning

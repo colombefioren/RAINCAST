@@ -1,7 +1,7 @@
 {
- "id": "cocofioren/indabax-rain-unet-c",
- "title": "indabax-rain-unet-c",
- "code_file": "indabax-rain-unet-c.py",
+ "id": "cocofioren/indabax-unet-r34-up2",
+ "title": "indabax-unet-r34-up2",
+ "code_file": "indabax-unet-r34-up2.py",
  "language": "python",
  "kernel_type": "script",
  "is_private": "true",

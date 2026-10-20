@@ -1,0 +1,15 @@
+{
+ "id": "cocofioren/indabax-unet-r34-shift",
+ "title": "indabax-unet-r34-shift",
+ "code_file": "indabax-unet-r34-shift.py",
+ "language": "python",
+ "kernel_type": "script",
+ "is_private": "true",
+ "enable_gpu": "true",
+ "enable_internet": "true",
+ "dataset_sources": [],
+ "competition_sources": [
+  "hackathon-IndabaX-MDG-2026"
+ ],
+ "kernel_sources": []
+}
