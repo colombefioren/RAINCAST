@@ -24,7 +24,9 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | 4-run blend + per-lead 3x3 dilation sweep | 0.694 | | dilation never selected, no gain |
 | 2026-10-20 | resnet34, soft CSI + multi-scale FSS loss, pos_w 2, mixup 0.5, wet sampling, translation aug (`indabax-unet-r34-loss`) | 0.679 single, 0.691 last-5 average | | same plateau as the shift recipe; thresholds drop to 0.45/0.40/0.375 (better calibrated), adds blend diversity |
 | 2026-10-20 | 6-run blend (adds r34-shift) | 0.6955 | not submitted | plateau: every recipe lands at 0.69 single, 0.695 blended |
-| 2026-10-20 | resnet34 shift recipe trained on ALL seasons incl. Dec 2023, 5 epochs (`indabax-unet-r34-shift-full-s101`) | no validation possible | | first full-data model for the final ensemble; thresholds taken from the validation blends |
+| 2026-10-20 | 7-run blend (adds r34-loss) | 0.6966 | not submitted | |
+| 2026-10-20 | resnet34 shift recipe trained on ALL seasons incl. Dec 2023, 5 epochs, last-3 average (`indabax-unet-r34-shift-full-s101`) | no validation possible | submitted | tests whether full-data training carries to the test period; thresholds 0.575/0.55/0.55 from the validation shift run |
+| 2026-10-20 | loss recipe trained on all seasons, 6 epochs (`indabax-unet-r34-loss-full-s102`) | no validation possible | | second full-data model |
 
 Kaggle kernel naming: the first three kernels are `indabax-rain-unet`, `indabax-rain-unet-b`, `indabax-rain-unet-c`. From the fourth on, the scheme is `indabax-unet-<encoder>-<variant>`.
 
@@ -34,4 +36,4 @@ Submission policy from 2026-10-20 evening (Colombe's decision): submit when the 
 
 | Date | Count |
 | --- | --- |
-| 2026-10-20 | 3 |
+| 2026-10-20 | 4 |
