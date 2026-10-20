@@ -28,6 +28,7 @@ p.add_argument("--dropout", type=float, default=0.0)
 p.add_argument("--stride", type=int, default=1, help="use every k-th hourly train sample")
 p.add_argument("--save_each", action="store_true", help="save test/val probs at every epoch")
 p.add_argument("--upscale", type=int, default=1, help="2: upsample inputs 2x before the encoder, downsample logits back")
+p.add_argument("--tta", type=int, default=0, help="1: average predictions over 8-pixel shifted copies (up, down, left, right)")
 p.add_argument("--advect", type=int, default=0, help="1: add optical-flow advected maps (+1h,+2h,+3h) as input channels")
 a = p.parse_args()
 torch.manual_seed(a.seed); np.random.seed(a.seed); torch.set_num_threads(a.threads)
@@ -141,11 +142,24 @@ def total_loss(logits, yb):
     if a.csi_w > 0: l = l + a.csi_w * soft_csi_loss(logits, yb)
     return l
 
+def tshift(t, dy, dx):
+    """Shift (N,C,H,W) by dy, dx with zero fill, like the training translation augmentation."""
+    out = torch.zeros_like(t); H, W = t.shape[2:]
+    ys, yd = (slice(0, H - dy), slice(dy, H)) if dy >= 0 else (slice(-dy, H), slice(0, H + dy))
+    xs, xd = (slice(0, W - dx), slice(dx, W)) if dx >= 0 else (slice(-dx, W), slice(0, W + dx))
+    out[:, :, yd, xd] = t[:, :, ys, xs]
+    return out
+VIEWS = [(0, 0), (8, 0), (-8, 0), (0, 8), (0, -8)] if a.tta else [(0, 0)]
 def predict(dl):
+    """Probabilities; with --tta, the average over shifted copies, each shifted back (pixels a view lost are skipped)."""
     model.eval(); out = []
     with torch.no_grad():
         for xb, _ in dl:
-            out.append(torch.sigmoid(model(xb.to(dev))).cpu().numpy())
+            xb = xb.to(dev); acc = 0; cnt = 0
+            for dy, dx in VIEWS:
+                acc = acc + tshift(torch.sigmoid(model(tshift(xb, dy, dx))), -dy, -dx)
+                cnt = cnt + tshift(tshift(torch.ones_like(xb[:, :1]), dy, dx), -dy, -dx)
+            out.append((acc / cnt.clamp(min=1)).cpu().numpy())
     return np.concatenate(out)
 
 def tune_thresholds(prob, obs):
