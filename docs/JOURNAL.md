@@ -24,7 +24,7 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 
 Kaggle kernel naming: the first three kernels are `indabax-rain-unet`, `indabax-rain-unet-b`, `indabax-rain-unet-c`. From the fourth on, the scheme is `indabax-unet-<encoder>-<variant>`.
 
-Submission policy from 2026-10-20 evening (Colombe's decision): submit only when validation FSS predicts a public score above the current leader. Offset validation to public so far: +0.010.
+Submission policy from 2026-10-20 evening (Colombe's decision): submit when the submission either predicts a public score above the current leader or gives information that helps get there (checking that a validation gain carries to the leaderboard). Offset validation to public so far: +0.010.
 
 ## Submissions used per day (limit 5)
 
