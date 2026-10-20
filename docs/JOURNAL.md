@@ -27,6 +27,9 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | 7-run blend (adds r34-loss) | 0.6966 | not submitted | |
 | 2026-10-20 | resnet34 shift recipe trained on ALL seasons incl. Dec 2023, 5 epochs, last-3 average (`indabax-unet-r34-shift-full-s101`) | no validation possible | 0.70337 | tests whether full-data training carries to the test period; thresholds 0.575/0.55/0.55 from the validation shift run |
 | 2026-10-20 | loss recipe trained on all seasons, 6 epochs (`indabax-unet-r34-loss-full-s102`) | no validation possible | | second full-data model; test probabilities kept per epoch for blending |
+| 2026-10-20 | 8-run blend, upscale run weighted 3 | 0.7012 | not submitted | old runs drag the upscale run down |
+| 2026-10-20 | shift last3 + loss last5 + upscale last5, weights 1:1:4 / 1:1:8 | 0.7037 / 0.7039 | not submitted | barely above the upscale run alone (0.7032): the older recipes add almost nothing now, so more upscale-style models are the way forward |
+| 2026-10-20 | full-data shift s101 last3 + full-data loss s102 last5, thresholds 0.525/0.475/0.45 from the matching validation pair (0.6957) | no validation possible | pending | submission 5: checks whether blending two full-data models carries to the public leaderboard before the final full-data upscale ensemble |
 | 2026-10-20 | up2 recipe on all seasons, 6 epochs, seed 103 (`indabax-unet-r34-up2-full-s103`) | no validation possible | | full-data version of the best recipe |
 | 2026-10-20 | resnet34, translation aug, 3x input upscaling, seed 32 (`indabax-unet-r34-up3`) | running | | does more upscaling keep helping? |
 
@@ -40,4 +43,4 @@ Reading of submission 4 (full-data single model, 0.70337): a single model of the
 
 | Date | Count |
 | --- | --- |
-| 2026-10-20 | 4 |
+| 2026-10-20 | 5 |
