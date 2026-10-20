@@ -16,10 +16,12 @@ def strip_doc(src):
 fss = strip_doc(open("src/fss.py").read())
 tr = strip_doc(open("src/train_unet.py").read())
 tr = tr.replace("from fss import fss_pooled, fss_per_sample, report\n", "")
+tr = tr.replace("from advect import advect_batch\n", "")
+adv = strip_doc(open("src/advect.py").read()).split('if __name__ == "__main__":')[0]
 tr = tr.replace("a = p.parse_args()\n", "a = p.parse_args(KERNEL_ARGS)\n")
 out = (f"KERNEL_ARGS = '''{args}'''.split()\n"
        "import subprocess, sys; subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'segmentation-models-pytorch'], check=False)\n"
-       + fss + "\n" + tr)
+       + fss + "\n" + adv + "\n" + tr)
 open(f"kernel/{slug}/{slug}.py", "w").write(out)
 ast.parse(out); print(f"kernel/{slug}/{slug}.py parses ok,", len(out.splitlines()), "lines")
 import json
