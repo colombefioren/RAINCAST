@@ -18,7 +18,7 @@ p.add_argument("--full", action="store_true", help="train on all data (no valida
 p.add_argument("--seed", type=int, default=42)
 p.add_argument("--limit", type=int, default=0, help="debug: use only first N train samples")
 p.add_argument("--threads", type=int, default=12)
-p.add_argument("--aug", type=int, default=0, help="1: random flips + 90-degree rotations on train")
+p.add_argument("--aug", type=int, default=0, help="1: flips + 90-degree rotations, 2: random translations")
 p.add_argument("--dropout", type=float, default=0.0)
 p.add_argument("--stride", type=int, default=1, help="use every k-th hourly train sample")
 p.add_argument("--save_each", action="store_true", help="save test/val probs at every epoch")
@@ -58,11 +58,20 @@ class DS(torch.utils.data.Dataset):
         if self.adv is not None: parts.append(np.log1p(np.maximum(self.adv[i], 0)) / 2.0)
         inp = np.concatenate(parts, 0).astype(np.float32)
         tgt = (self.y[i] > 1.0).astype(np.float32) if self.y is not None else np.zeros((3, H, W), np.float32)
-        if self.aug:
+        if self.aug == 1:  # rotations and flips: break the geographic motion prior, kept for reference
             k = np.random.randint(4)
             inp, tgt = np.rot90(inp, k, axes=(1, 2)), np.rot90(tgt, k, axes=(1, 2))
             if np.random.rand() < 0.5: inp, tgt = inp[:, :, ::-1], tgt[:, :, ::-1]
             inp, tgt = np.ascontiguousarray(inp), np.ascontiguousarray(tgt)
+        elif self.aug == 2:  # random translation up to 16 px with zero fill: keeps motion direction
+            dy, dx = np.random.randint(-16, 17, size=2)
+            def shift(arr):
+                out = np.zeros_like(arr)
+                ys, yd = (slice(0, H - dy), slice(dy, H)) if dy >= 0 else (slice(-dy, H), slice(0, H + dy))
+                xs, xd = (slice(0, W - dx), slice(dx, W)) if dx >= 0 else (slice(-dx, W), slice(0, W + dx))
+                out[:, yd, xd] = arr[:, ys, xs]
+                return out
+            inp, tgt = shift(inp), shift(tgt)
         return torch.from_numpy(inp), torch.from_numpy(tgt)
 
 tf_tr, tf_te = time_feats(ts), time_feats(tst)
