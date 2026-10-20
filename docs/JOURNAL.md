@@ -37,7 +37,10 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | translation test-time augmentation on the upscale checkpoint (`src/eval_tta.py`, shifts 4 and 8 px, every 6th validation sample) | 0.6994 without, 0.7006 with | | small but consistent on all leads; built into `train_unet.py` as `--tta 1` for new runs |
 | 2026-10-20 | expected-FSS decoder instead of per-pixel thresholds (`src/fss_decode.py`, checked by `src/eval_decode.py`) on the 2x upscale run | 0.6998 thresholds, 0.7546 decoder (calibration and mu fitted on alternate weeks, scored on the other weeks) | | the largest gain of the project, +0.055 out of sample; confirmed with an independent scipy implementation of FSS, pooled and per sample |
 | 2026-10-20 | shift last3 + loss last5 + up2 last5 (1:1:8), decoded (`outputs/blend10dec.json`, mu 0.425/0.375/0.35) | 0.7579 (in-sample calibration) | ready as `sub06` | predicted public about 0.768 |
-| 2026-10-20 | up3 last5 + up2 last5 + r50 last4, thresholds, weights 1:1:1 / 2:1:1 | 0.7090 / 0.7095 | | best thresholded blend; decoding it next |
+| 2026-10-20 | up3 last5 + up2 last5 + r50 last4, thresholds, weights 1:1:1 / 2:1:1 | 0.7090 / 0.7095 | | best thresholded blend; decoded below |
+| 2026-10-20 | same blend 2:1:1, decoded (`outputs/blend12dec.json`, mu 0.425/0.375/0.35) | 0.7624 (in-sample calibration) | ready as `sub07` | predicted public about 0.772 |
+| 2026-10-20 | decoder convergence check: 3, 6, 12 sweeps, start from threshold mask or empty mask | identical to 4 decimals | | the optimiser is not a lever; better probabilities are |
+| 2026-10-20 | resnet34, 2x upscale, plain cross-entropy (pos_w 1, no soft FSS), TTA (`indabax-unet-r34-up2-bce`) | 0.6908 single, 0.6927 last-2 average (thresholds 0.35/0.30/0.275) | | worse with thresholds; decoding comparison running |
 
 From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
