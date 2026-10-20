@@ -39,6 +39,7 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | shift last3 + loss last5 + up2 last5 (1:1:8), decoded (`outputs/blend10dec.json`, mu 0.425/0.375/0.35) | 0.7579 (in-sample calibration) | ready as `sub06` | predicted public about 0.768 |
 | 2026-10-20 | up3 last5 + up2 last5 + r50 last4, thresholds, weights 1:1:1 / 2:1:1 | 0.7090 / 0.7095 | | best thresholded blend; decoded below |
 | 2026-10-20 | same blend 2:1:1, decoded (`outputs/blend12dec.json`, mu 0.425/0.375/0.35) | 0.7624 (in-sample calibration) | ready as `sub07` | predicted public about 0.772 |
+| 2026-10-20 | up3, up2, r50 + older loss and shift models (2:1:1:0.5:0.5), decoded | 0.7619 | | older non-upscaled models no longer help: 0.7624 without them |
 | 2026-10-20 | decoder convergence check: 3, 6, 12 sweeps, start from threshold mask or empty mask | identical to 4 decimals | | the optimiser is not a lever; better probabilities are |
 | 2026-10-20 | resnet34, 2x upscale, plain cross-entropy (pos_w 1, no soft FSS), TTA (`indabax-unet-r34-up2-bce`) | 0.6908 single, 0.6927 last-2 average (thresholds 0.35/0.30/0.275) | | worse with thresholds |
 | 2026-10-20 | decoded single models, same calibration and mu search: cross-entropy run last3 vs soft-FSS up2 run last5 | 0.7458 vs 0.7568 | | the soft-FSS loss also gives better probabilities for the decoder; plain cross-entropy dropped |
