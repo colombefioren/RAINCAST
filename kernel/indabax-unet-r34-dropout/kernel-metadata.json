@@ -1,7 +1,7 @@
 {
- "id": "cocofioren/indabax-rain-unet-c",
- "title": "indabax-rain-unet-c",
- "code_file": "indabax-rain-unet-c.py",
+ "id": "cocofioren/indabax-unet-r34-dropout",
+ "title": "indabax-unet-r34-dropout",
+ "code_file": "indabax-unet-r34-dropout.py",
  "language": "python",
  "kernel_type": "script",
  "is_private": "true",
