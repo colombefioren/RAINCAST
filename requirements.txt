@@ -1,0 +1,9 @@
+numpy
+pandas
+scipy
+torch
+torchvision
+segmentation-models-pytorch
+timm
+matplotlib
+kaggle

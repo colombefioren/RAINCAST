@@ -1,0 +1,12 @@
+data/
+outputs/
+dbg/
+.venv/
+__pycache__/
+*.npz
+*.npy
+*.pt
+*.csv
+*.zip
+.env
+.env.*
