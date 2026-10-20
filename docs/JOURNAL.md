@@ -33,6 +33,12 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | up2 recipe on all seasons, 6 epochs, seed 103 (`indabax-unet-r34-up2-full-s103`) | no validation possible | | full-data version of the best recipe |
 | 2026-10-20 | resnet34, translation aug, 3x input upscaling, seed 32 (`indabax-unet-r34-up3`) | running | | does more upscaling keep helping? |
 
+| 2026-10-20 | resnet50, 2x upscale, validation run (`indabax-unet-r50-up2`) | running | | does a bigger encoder help once the input is upscaled? |
+| 2026-10-20 | translation test-time augmentation on the upscale checkpoint (`src/eval_tta.py`, shifts 4 and 8 px) | running locally | | cheap gain if the model is not perfectly shift-invariant |
+| 2026-10-20 | expected-FSS decoder instead of per-pixel thresholds (`src/fss_decode.py`, checked by `src/eval_decode.py`) | running locally | | in uncertain areas a partial mask scores better on a 3x3 neighbourhood metric than an all-dry one |
+
+From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
+
 Kaggle kernel naming: the first three kernels are `indabax-rain-unet`, `indabax-rain-unet-b`, `indabax-rain-unet-c`. From the fourth on, the scheme is `indabax-unet-<encoder>-<variant>`.
 
 Submission policy from 2026-10-20 evening (Colombe's decision): submit when the submission either predicts a public score above the current leader or gives information that helps get there (checking that a validation gain carries to the leaderboard). Offset validation to public so far: +0.010.
