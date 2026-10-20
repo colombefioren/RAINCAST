@@ -1,4 +1,4 @@
-KERNEL_ARGS = '''--data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --encoder resnet34 --epochs 12 --bs 32 --threads 4'''.split()
+KERNEL_ARGS = '''--data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --encoder resnet18 --epochs 6 --lr 5e-4 --aug 1 --dropout 0.2 --stride 2 --seed 7'''.split()
 import subprocess, sys; subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'segmentation-models-pytorch'], check=False)
 import numpy as np
 from scipy.ndimage import uniform_filter
@@ -61,6 +61,10 @@ p.add_argument("--full", action="store_true", help="train on all data (no valida
 p.add_argument("--seed", type=int, default=42)
 p.add_argument("--limit", type=int, default=0, help="debug: use only first N train samples")
 p.add_argument("--threads", type=int, default=12)
+p.add_argument("--aug", type=int, default=0, help="1: random flips + 90-degree rotations on train")
+p.add_argument("--dropout", type=float, default=0.0)
+p.add_argument("--stride", type=int, default=1, help="use every k-th hourly train sample")
+p.add_argument("--save_each", action="store_true", help="save test/val probs at every epoch")
 a = p.parse_args(KERNEL_ARGS)
 torch.manual_seed(a.seed); np.random.seed(a.seed); torch.set_num_threads(a.threads)
 dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -83,7 +87,7 @@ def time_feats(t):
     return np.stack([np.sin(2 * np.pi * h / 24), np.cos(2 * np.pi * h / 24), sd], 1).astype(np.float32)
 
 class DS(torch.utils.data.Dataset):
-    def __init__(self, X, y, tf): self.X, self.y, self.tf = X, y, tf
+    def __init__(self, X, y, tf, aug=0): self.X, self.y, self.tf, self.aug = X, y, tf, aug
     def __len__(self): return len(self.X)
     def __getitem__(self, i):
         x = np.log1p(np.maximum(self.X[i], 0)) / 2.0  # (3,H,W)
@@ -91,14 +95,22 @@ class DS(torch.utils.data.Dataset):
         tfe = np.broadcast_to(self.tf[i][:, None, None], (3, H, W))
         inp = np.concatenate([x, lat_c[None], lon_c[None], tfe], 0).astype(np.float32)
         tgt = (self.y[i] > 1.0).astype(np.float32) if self.y is not None else np.zeros((3, H, W), np.float32)
+        if self.aug:
+            k = np.random.randint(4)
+            inp, tgt = np.rot90(inp, k, axes=(1, 2)), np.rot90(tgt, k, axes=(1, 2))
+            if np.random.rand() < 0.5: inp, tgt = inp[:, :, ::-1], tgt[:, :, ::-1]
+            inp, tgt = np.ascontiguousarray(inp), np.ascontiguousarray(tgt)
         return torch.from_numpy(inp), torch.from_numpy(tgt)
 
 tf_tr, tf_te = time_feats(ts), time_feats(tst)
-dl_tr = torch.utils.data.DataLoader(DS(X[~val], y[~val], tf_tr[~val]), batch_size=a.bs, shuffle=True, num_workers=2, drop_last=True)
+tr_idx = np.where(~val)[0][::a.stride]
+dl_tr = torch.utils.data.DataLoader(DS(X[tr_idx], y[tr_idx], tf_tr[tr_idx], a.aug), batch_size=a.bs, shuffle=True, num_workers=2, drop_last=True)
 dl_va = torch.utils.data.DataLoader(DS(X[val], y[val], tf_tr[val]), batch_size=64, num_workers=2) if val.any() else None
 dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te), batch_size=64, num_workers=2)
 
 model = smp.Unet(a.encoder, encoder_weights="imagenet", in_channels=8, classes=3).to(dev)
+if a.dropout > 0:
+    model.segmentation_head = nn.Sequential(nn.Dropout2d(a.dropout), model.segmentation_head)
 opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
 steps = a.epochs * len(dl_tr)
 sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=steps, pct_start=0.15)
@@ -150,6 +162,9 @@ for ep in range(a.epochs):
     else:
         torch.save(model.state_dict(), f"{a.out}/{tag}.pt")
     print(msg, flush=True); hist.append(msg)
+    if a.save_each:
+        np.save(f"{a.out}/{tag}_ep{ep}_testprob.npy", predict(dl_te))
+        if dl_va is not None: np.save(f"{a.out}/{tag}_ep{ep}_valprob.npy", pv)
 
 if dl_va is not None:
     model.load_state_dict(torch.load(f"{a.out}/{tag}.pt"))
