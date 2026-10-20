@@ -12,7 +12,7 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | resnet18, same + stride 2 (kernel -b v1) | 0.662 (epoch 5 of 6) | | rotations + half data: slow, underfits |
 | 2026-10-20 | resnet18, 4 epochs, rot90+flip aug, dropout 0.2, advection inputs, stride 2, laptop CPU | 0.664 (tuned thr 0.625/0.575/0.550) | | worse than run 1: rotation augmentation likely breaks the geographic motion prior; stride 2 halves data |
 | 2026-10-20 | blend 2:1 of run 1 and the CPU run | 0.686 | submitted | +0.001 only |
-| 2026-10-20 | resnet34, 3 epochs, no aug, dropout 0.2, advection inputs, laptop CPU | running | | isolates the augmentation effect |
+| 2026-10-20 | resnet34, 3 epochs, no aug, dropout 0.2, advection inputs, laptop CPU | 0.653 after epoch 1, process died in epoch 2 | | killed (memory) while other jobs ran; the GPU kernel `indabax-unet-r34-advect` covers the same question |
 | 2026-10-20 | resnet34, 5 epochs, lr 5e-4, no aug, dropout 0.2, advection (`indabax-unet-r34-advect`) | 0.680 single, 0.688 last-4-epoch average | | advection inputs: no measurable gain over the next row |
 | 2026-10-20 | resnet34, 5 epochs, lr 5e-4, no aug, dropout 0.2 (`indabax-unet-r34-dropout`) | 0.678 single, 0.686 last-4-epoch average | | dropout alone removes the overfitting; peak now at epoch 4 |
 | 2026-10-20 | blend of run 1 + r34-advect last4 + r34-dropout last4 + kernel v2 epoch 6 | 0.694 (thr 0.575/0.55/0.55) | 0.70364 | +0.009 over best single |
