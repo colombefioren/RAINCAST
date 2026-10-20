@@ -108,6 +108,11 @@ torch.manual_seed(a.seed); np.random.seed(a.seed); torch.set_num_threads(a.threa
 dev = "cuda" if torch.cuda.is_available() else "cpu"
 print("device", dev, flush=True)
 
+import os, glob
+if not os.path.exists(f"{a.data}/train.npz"):  # Kaggle sometimes mounts competition data under another path
+    found = glob.glob("/kaggle/input/**/train.npz", recursive=True)
+    print("data not at", a.data, "found", found, flush=True)
+    if found: a.data = os.path.dirname(found[0])
 tr = np.load(f"{a.data}/train.npz"); te = np.load(f"{a.data}/test.npz")
 X, y, times = tr["X"], tr["y"], tr["times"]; Xt, tt = te["X"], te["times"]
 lats, lons = tr["lats"], tr["lons"]
