@@ -1,4 +1,4 @@
-KERNEL_ARGS = '''--data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --tta 1 --encoder efficientnet-b3 --epochs 6 --lr 5e-4 --aug 2 --dropout 0.2 --upscale 3 --seed 23'''.split()
+KERNEL_ARGS = '''--data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --tta 1 --encoder efficientnet-b3 --epochs 6 --lr 5e-4 --bs 16 --aug 2 --dropout 0.2 --upscale 3 --seed 23'''.split()
 import subprocess, sys; subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'segmentation-models-pytorch'], check=False)
 import numpy as np
 from scipy.ndimage import uniform_filter
