@@ -8,6 +8,7 @@ Source: the competition Rules page, read on 2026-10-20. Full text lives on Kaggl
 | Max 5 submissions per day | `docs/JOURNAL.md` tracks the daily count. Submit only after a validation score justifies it. |
 | Deadline 30 October 2026, 09:00 UTC (12:00 Madagascar) | Final two submissions selected on Kaggle before that time. |
 | Do not reconstruct, infer or exploit the hidden test targets | 31 test samples overlap in time with other test samples, so one sample's input contains another sample's target. The code never looks across test samples: each prediction uses only that sample's own three input maps. |
+| No rule restricts post-processing of predictions; the test-target rule above still applies | The decoder (`src/fss_decode.py`) turns each test sample's own probability map into a rain mask. Its calibration table and trade-off parameter are fitted on the validation season of the training data. It never reads another test sample. |
 | External data, pretrained models and open-source software allowed if freely accessible and documented | ImageNet-pretrained encoders from `segmentation-models-pytorch` (MIT licence). No external datasets. Documented in `docs/APPROACH.md`. |
 | No private sharing of code or predictions | This repository is private and shared with nobody. |
 | Each submission must be the participant's own work | Colombe runs, understands and can explain every script. An AI coding assistant (Claude) was used as a tool during development; this is stated in the write-up for transparency under rule 2.11 on responsible AI use. |

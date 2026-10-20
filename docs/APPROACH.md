@@ -60,6 +60,23 @@ growth/decay of rain cells.
   seeds and recipes are averaged before thresholding. Training on all seasons turned out to be worth only
   about +0.002 on the public leaderboard (submissions 4 and 5).
 
+## From probabilities to a rain mask
+
+A single threshold per lead time is not what the metric wants. FSS compares 3x3 neighbourhood
+fractions, so in an area where rain is uncertain the best answer is a partial mask whose local density
+matches the expected rain coverage. `src/fss_decode.py` does this:
+
+1. Calibrate the blended probabilities with an isotonic fit of observed rain frequency on the
+   validation season (one table per lead time).
+2. With calibrated p, the expected observed fraction is box(p), and the expected FSS of a mask M is
+   2 * sum(M * q) / (sum(box(M)^2) + C), with q = box(box(p)) and C independent of M.
+3. Maximise sum(M * q) - mu * sum(box(M)^2) with iterated conditional modes. Pixels on the same
+   position of a 3x3 grid cannot interact, so each of the 9 groups is updated in one vectorised step.
+   mu is tuned per lead time on validation (theory: half the achievable FSS, about 0.33 to 0.43).
+
+Out-of-sample check (calibration and mu fitted on alternate weeks, scored on the other weeks):
++0.04 at +1h, +0.05 at +2h, +0.065 at +3h. The gain grows with lead time because uncertainty grows.
+
 ## What was tried and rejected
 
 Recorded in `docs/JOURNAL.md` as it happens.
