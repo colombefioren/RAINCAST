@@ -31,11 +31,13 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | shift last3 + loss last5 + upscale last5, weights 1:1:4 / 1:1:8 | 0.7037 / 0.7039 | not submitted | barely above the upscale run alone (0.7032): the older recipes add almost nothing now, so more upscale-style models are the way forward |
 | 2026-10-20 | full-data shift s101 last3 + full-data loss s102 last5, thresholds 0.525/0.475/0.45 from the matching validation pair (0.6957) | no validation possible | 0.70517 (new best) | submission 5: checks whether blending two full-data models carries to the public leaderboard before the final full-data upscale ensemble |
 | 2026-10-20 | up2 recipe on all seasons, 6 epochs, seed 103 (`indabax-unet-r34-up2-full-s103`) | no validation possible | | full-data version of the best recipe |
-| 2026-10-20 | resnet34, translation aug, 3x input upscaling, seed 32 (`indabax-unet-r34-up3`) | running | | does more upscaling keep helping? |
+| 2026-10-20 | resnet34, translation aug, 3x input upscaling, seed 32 (`indabax-unet-r34-up3`) | 0.7015 single, 0.7081 last-5 average | | 3x beats 2x by +0.005: more upscaling still helps, 4x launched (`indabax-unet-r34-up4`) |
 
-| 2026-10-20 | resnet50, 2x upscale, validation run (`indabax-unet-r50-up2`) | running | | does a bigger encoder help once the input is upscaled? |
-| 2026-10-20 | translation test-time augmentation on the upscale checkpoint (`src/eval_tta.py`, shifts 4 and 8 px) | running locally | | cheap gain if the model is not perfectly shift-invariant |
-| 2026-10-20 | expected-FSS decoder instead of per-pixel thresholds (`src/fss_decode.py`, checked by `src/eval_decode.py`) | running locally | | in uncertain areas a partial mask scores better on a 3x3 neighbourhood metric than an all-dry one |
+| 2026-10-20 | resnet50, 2x upscale, validation run (`indabax-unet-r50-up2`) | 0.6993 single, 0.7040 last-4 average | | same level as resnet34 at 2x: encoder size is not the bottleneck, but it adds blend diversity |
+| 2026-10-20 | translation test-time augmentation on the upscale checkpoint (`src/eval_tta.py`, shifts 4 and 8 px, every 6th validation sample) | 0.6994 without, 0.7006 with | | small but consistent on all leads; built into `train_unet.py` as `--tta 1` for new runs |
+| 2026-10-20 | expected-FSS decoder instead of per-pixel thresholds (`src/fss_decode.py`, checked by `src/eval_decode.py`) on the 2x upscale run | 0.6998 thresholds, 0.7546 decoder (calibration and mu fitted on alternate weeks, scored on the other weeks) | | the largest gain of the project, +0.055 out of sample; confirmed with an independent scipy implementation of FSS, pooled and per sample |
+| 2026-10-20 | shift last3 + loss last5 + up2 last5 (1:1:8), decoded (`outputs/blend10dec.json`, mu 0.425/0.375/0.35) | 0.7579 (in-sample calibration) | ready as `sub06` | predicted public about 0.768 |
+| 2026-10-20 | up3 last5 + up2 last5 + r50 last4, thresholds, weights 1:1:1 / 2:1:1 | 0.7090 / 0.7095 | | best thresholded blend; decoding it next |
 
 From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
