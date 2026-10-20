@@ -22,7 +22,9 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | resnet34, translation aug, 2x input upscaling (`indabax-unet-r34-up2`) | running | | pretrained encoder sees finer structure |
 | 2026-10-20 | efficientnet-b3, translation aug, dropout, advection, 6 epochs (`indabax-unet-effb3-shift`) | 0.684 single, 0.687 last-4 average | | same plateau as resnet34; useful as blend diversity |
 | 2026-10-20 | 4-run blend + per-lead 3x3 dilation sweep | 0.694 | | dilation never selected, no gain |
-| 2026-10-20 | resnet34, soft CSI + multi-scale FSS loss, pos_w 2, mixup 0.5, wet sampling, translation aug (`indabax-unet-r34-loss`) | running | | literature-backed loss and sampling changes, see docs/RESEARCH.md |
+| 2026-10-20 | resnet34, soft CSI + multi-scale FSS loss, pos_w 2, mixup 0.5, wet sampling, translation aug (`indabax-unet-r34-loss`) | 0.679 single, 0.691 last-5 average | | same plateau as the shift recipe; thresholds drop to 0.45/0.40/0.375 (better calibrated), adds blend diversity |
+| 2026-10-20 | 6-run blend (adds r34-shift) | 0.6955 | not submitted | plateau: every recipe lands at 0.69 single, 0.695 blended |
+| 2026-10-20 | resnet34 shift recipe trained on ALL seasons incl. Dec 2023, 5 epochs (`indabax-unet-r34-shift-full-s101`) | no validation possible | | first full-data model for the final ensemble; thresholds taken from the validation blends |
 
 Kaggle kernel naming: the first three kernels are `indabax-rain-unet`, `indabax-rain-unet-b`, `indabax-rain-unet-c`. From the fourth on, the scheme is `indabax-unet-<encoder>-<variant>`.
 
