@@ -45,6 +45,10 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | decoded single models, same calibration and mu search: cross-entropy run last3 vs soft-FSS up2 run last5 | 0.7458 vs 0.7568 | | the soft-FSS loss also gives better probabilities for the decoder; plain cross-entropy dropped |
 
 From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
+| 2026-10-21 | resnet34, 4x upscale, TTA (`indabax-unet-r34-up4`) | 0.7030 single, 0.7073 last-4 average | | same as 3x at twice the cost: 3x is the sweet spot |
+| 2026-10-21 | resnet34, 3x upscale, TTA, second seed (`indabax-unet-r34-up3-s35`) | 0.7024 single, 0.7066 last-4 average | | seed spread about 0.0015 |
+| 2026-10-21 | blend of up3 s32, up3 s35, up4, up2, r50-up2, equal weights, thresholds | 0.7108 | | best thresholded blend; decoding next |
+| 2026-10-21 | resnet50 3x and multi-scale-loss 3x kernels (`indabax-unet-r50-up3`, `indabax-unet-r34-up3-loss`) | running | | diversity for the ensemble |
 
 Kaggle kernel naming: the first three kernels are `indabax-rain-unet`, `indabax-rain-unet-b`, `indabax-rain-unet-c`. From the fourth on, the scheme is `indabax-unet-<encoder>-<variant>`.
 
