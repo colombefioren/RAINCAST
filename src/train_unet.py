@@ -22,6 +22,7 @@ p.add_argument("--aug", type=int, default=0, help="1: flips + 90-degree rotation
 p.add_argument("--dropout", type=float, default=0.0)
 p.add_argument("--stride", type=int, default=1, help="use every k-th hourly train sample")
 p.add_argument("--save_each", action="store_true", help="save test/val probs at every epoch")
+p.add_argument("--upscale", type=int, default=1, help="2: upsample inputs 2x before the encoder, downsample logits back")
 p.add_argument("--advect", type=int, default=0, help="1: add optical-flow advected maps (+1h,+2h,+3h) as input channels")
 a = p.parse_args()
 torch.manual_seed(a.seed); np.random.seed(a.seed); torch.set_num_threads(a.threads)
@@ -84,6 +85,13 @@ dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt), batch_size=64,
 model = smp.Unet(a.encoder, encoder_weights="imagenet", in_channels=N_IN, classes=3).to(dev)
 if a.dropout > 0:
     model.segmentation_head = nn.Sequential(nn.Dropout2d(a.dropout), model.segmentation_head)
+if a.upscale > 1:
+    class Upscaled(nn.Module):
+        def __init__(self, m, f): super().__init__(); self.m, self.f = m, f
+        def forward(self, x):
+            y = self.m(F.interpolate(x, scale_factor=self.f, mode="bilinear", align_corners=False))
+            return F.avg_pool2d(y, self.f)
+    model = Upscaled(model, a.upscale).to(dev)
 opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
 steps = a.epochs * len(dl_tr)
 sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=steps, pct_start=0.15)
