@@ -10,6 +10,7 @@ p.add_argument("--data", required=True); p.add_argument("--out", required=True)
 p.add_argument("--smooth", type=int, default=0, help="average probabilities over k x k window before thresholding")
 p.add_argument("--dilate", type=int, default=0, help="1: also sweep a 3x3 dilation per lead")
 p.add_argument("--decode", type=int, default=0, help="1: also fit calibration and tune the expected-FSS decoder (src/fss_decode.py) per lead")
+p.add_argument("--mu", default="", help="comma-separated decoder mu per lead; skips the mu search (faster)")
 p.add_argument("--weights", default="", help="comma-separated blend weights, default equal")
 p.add_argument("probs", nargs="+")
 a = p.parse_args()
@@ -66,11 +67,14 @@ if a.decode:
     for k in range(3):
         table = fit_calibration(PV[:, k], yv[:, k] > 1.0)
         c_half, y_half = calibrate(PV[::2, k], table), yv[::2, k:k+1]
-        sc = lambda m: fss_pooled(decode(c_half, m)[:, None] * 10.0, y_half)[0]
-        tried = {round(m, 3): sc(m) for m in np.arange(0.25, 0.501, 0.05)}
-        m0 = max(tried, key=tried.get)
-        for m in (m0 - 0.025, m0 + 0.025): tried[round(m, 3)] = sc(m)
-        mu = max(tried, key=tried.get)
+        if a.mu:
+            mu = float(a.mu.split(",")[k])
+        else:
+            sc = lambda m: fss_pooled(decode(c_half, m)[:, None] * 10.0, y_half)[0]
+            tried = {round(m, 3): sc(m) for m in np.arange(0.25, 0.501, 0.05)}
+            m0 = max(tried, key=tried.get)
+            for m in (m0 - 0.025, m0 + 0.025): tried[round(m, 3)] = sc(m)
+            mu = max(tried, key=tried.get)
         full = fss_pooled(decode(calibrate(PV[:, k], table), mu)[:, None] * 10.0, yv[:, k:k+1])[0]
         print(f"lead {k+1}: decoder mu {mu:.3f} fss {full:.4f} (threshold {best[k]:.4f})", flush=True)
         tables.append(table.tolist()); mus.append(float(mu)); dec.append(float(full))

@@ -10,6 +10,7 @@ p = argparse.ArgumentParser()
 p.add_argument("--data", required=True)
 p.add_argument("--out", default="outputs")
 p.add_argument("--encoder", default="resnet18")
+p.add_argument("--arch", default="Unet", choices=["Unet", "UnetPlusPlus", "FPN", "DeepLabV3Plus"], help="segmentation-models-pytorch decoder")
 p.add_argument("--epochs", type=int, default=8)
 p.add_argument("--bs", type=int, default=32)
 p.add_argument("--lr", type=float, default=1e-3)
@@ -107,7 +108,7 @@ else:
 dl_va = torch.utils.data.DataLoader(DS(X[val], y[val], tf_tr[val], 0, sub(ADV, val)), batch_size=64, num_workers=2) if val.any() else None
 dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt), batch_size=64, num_workers=2)
 
-model = smp.Unet(a.encoder, encoder_weights="imagenet", in_channels=N_IN, classes=3).to(dev)
+model = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet", in_channels=N_IN, classes=3).to(dev)
 if a.dropout > 0:
     model.segmentation_head = nn.Sequential(nn.Dropout2d(a.dropout), model.segmentation_head)
 if a.upscale > 1:
@@ -172,7 +173,7 @@ def tune_thresholds(prob, obs):
     return best
 
 import os; os.makedirs(a.out, exist_ok=True)
-tag = f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
+tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
 best_score, hist, VAL_EPOCHS = -1, [], []
 for ep in range(a.epochs):
     model.train(); t0 = time.time(); tl = 0

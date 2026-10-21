@@ -39,10 +39,39 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-20 | shift last3 + loss last5 + up2 last5 (1:1:8), decoded (`outputs/blend10dec.json`, mu 0.425/0.375/0.35) | 0.7579 (in-sample calibration) | ready as `sub06` | predicted public about 0.768 |
 | 2026-10-20 | up3 last5 + up2 last5 + r50 last4, thresholds, weights 1:1:1 / 2:1:1 | 0.7090 / 0.7095 | | best thresholded blend; decoded below |
 | 2026-10-20 | same blend 2:1:1, decoded (`outputs/blend12dec.json`, mu 0.425/0.375/0.35) | 0.7624 (in-sample calibration) | ready as `sub07` | predicted public about 0.772 |
+| 2026-10-20 | up3, up2, r50 + older loss and shift models (2:1:1:0.5:0.5), decoded | 0.7619 | | older non-upscaled models no longer help: 0.7624 without them |
 | 2026-10-20 | decoder convergence check: 3, 6, 12 sweeps, start from threshold mask or empty mask | identical to 4 decimals | | the optimiser is not a lever; better probabilities are |
-| 2026-10-20 | resnet34, 2x upscale, plain cross-entropy (pos_w 1, no soft FSS), TTA (`indabax-unet-r34-up2-bce`) | 0.6908 single, 0.6927 last-2 average (thresholds 0.35/0.30/0.275) | | worse with thresholds; decoding comparison running |
+| 2026-10-20 | resnet34, 2x upscale, plain cross-entropy (pos_w 1, no soft FSS), TTA (`indabax-unet-r34-up2-bce`) | 0.6908 single, 0.6927 last-2 average (thresholds 0.35/0.30/0.275) | | worse with thresholds |
+| 2026-10-20 | decoded single models, same calibration and mu search: cross-entropy run last3 vs soft-FSS up2 run last5 | 0.7458 vs 0.7568 | | the soft-FSS loss also gives better probabilities for the decoder; plain cross-entropy dropped |
+| 2026-10-21 | resnet34, 4x upscale, TTA (`indabax-unet-r34-up4`) | 0.7030 single, 0.7073 last-4 average | | same as 3x at twice the cost: 3x is the sweet spot |
+| 2026-10-21 | resnet34, 3x upscale, TTA, second seed (`indabax-unet-r34-up3-s35`) | 0.7024 single, 0.7066 last-4 average | | seed spread about 0.0015 |
+| 2026-10-21 | blend of up3 s32, up3 s35, up4, up2, r50-up2, equal weights, thresholds | 0.7108 | | best thresholded blend |
+| 2026-10-21 | same five-model blend, decoded (`outputs/blend15dec.json`, mu 0.425/0.375/0.35) | 0.7641 (in-sample calibration) | ready as `sub08` | predicted public about 0.774; candidate for the first submission of 21 October |
+| 2026-10-21 | resnet34, 3x upscale, multi-scale FSS + soft CSI loss, pos_w 2, mixup, wet sampling, TTA (`indabax-unet-r34-up3-loss`) | 0.6949 single, 0.7060 last-6 average | | same level, different errors: useful for the blend |
+| 2026-10-21 | five-model blend weighted 2:2:1:1:1 (3x runs doubled), decoded with fixed mu | 0.7641 | | same as equal weights |
+| 2026-10-21 | six-model blend (adds up3-loss), equal weights, decoded with fixed mu (`outputs/blend16dec.json`) | 0.7644 | ready as `sub09` | ensembling is close to its ceiling: +0.0003 for the sixth model |
+| 2026-10-21 | resnet50, 3x upscale, TTA (`indabax-unet-r50-up3`) | 0.6997 single, 0.7082 last-4 average | | best single model, tied with resnet34 3x |
+| 2026-10-21 | seven-model blend (adds r50-up3), equal weights, decoded with fixed mu (`outputs/blend17dec.json`) | 0.7650 | ready as `sub10` | predicted public about 0.775; first submission of 21 October |
+| 2026-10-21 | efficientnet-b3, 3x upscale, batch 16 (batch 32 ran out of GPU memory), TTA (`indabax-unet-effb3-up3`) | 0.6997 single, 0.7057 last-5 average | | |
+| 2026-10-21 | eight-model blend (adds effb3-up3), equal weights, decoded with fixed mu (`outputs/blend18dec.json`) | 0.7655 | 0.77372 (first place, +0.044 over the next team) | submission 11; validation to public offset +0.008, in line with the +0.010 seen with thresholds |
+| 2026-10-21 | resnet34 3x for 9 epochs, TTA (`indabax-unet-r34-up3-long`) | 0.7001 single, 0.7097 last-8 average | | best single model: longer training plus a longer epoch average helps by about +0.0015; resnet50 version launched (`indabax-unet-r50-up3-long`) |
+| 2026-10-21 | nine-model blend (adds r34-up3-long), decoded with fixed mu | 0.7658 | | |
+| 2026-10-21 | seven models without the two 2x runs, decoded with fixed mu (`outputs/blend20dec.json`) | 0.7661 | not submitted | best validation so far, but within noise of the submitted 0.7655; not worth a submission |
+| 2026-10-21 | control: resnet50 3x validation run alone, last-4 average, decoded with its own calibration (`outputs/single_r50up3_dec.json`) | 0.7618 | 0.77257 | submission 12; paired with the next row |
+| 2026-10-21 | same recipe trained on all seasons (`indabax-unet-r50-up3-full-s152`), last-4 average, decoded with the control's calibration and mu | no validation possible | 0.77881 (new best) | submission 13: full-data training is worth about +0.006 once decoded, more than the +0.002 seen with thresholds. Plan: retrain the best recipes on all seasons and decode them with calibration from their validation twins |
+| 2026-10-21 | resnet50, 3x, 9 epochs, TTA (`indabax-unet-r50-up3-long`) | 0.7020 single, 0.7096 last-7 average | | as good as the resnet34 long run |
+| 2026-10-21 | eight 3x/4x validation runs (up3 s32, up3 s35, up4, up3-loss, r50-up3, effb3-up3, r34 long, r50 long), decoded with fixed mu (`outputs/blend21dec.json`) | 0.7665 | | best validation; its full-data twins are being trained for the final ensemble |
+| 2026-10-21 | full-data twins queued: r34 long s138, effb3 s123, up3-loss s136, up3 s132, up4 s134, r50 long s153 (pushed by a queue script as GPU slots free) | running | | final ensemble = mean of full-data test probabilities, decoded with the calibration of the matching validation blend |
+| 2026-10-21 | full-data r50 3x (s152, last 4) + full-data r34 3x long (s138, last 8), decoded with the calibration of their validation twins (`outputs/twins2dec.json`, twins 0.7650) | twins 0.7650 | 0.78067 (new best) | submission 14: two full-data models beat one (0.77881) |
+| 2026-10-21 | U-Net++ decoder, resnet34, 3x, 9 epochs, batch 16, TTA (`indabax-unetpp-r34-up3-long`, 2.57 GPU hours) | 0.7032 single, 0.7128 last-8 average | | best single model so far |
+| 2026-10-21 | nine validation runs (the eight 3x/4x runs + U-Net++), decoded with fixed mu (`outputs/blend22dec.json`) | 0.7670 | | best validation; U-Net++ full-data twin queued |
+| 2026-10-21 | full-data twins finished: r34 3x (s132, 0.57 GPU hours, cheaper than its validation twin because no per-epoch validation) and r50 3x long (s153) | no validation possible | | |
+| 2026-10-21 | four full-data models (r50 3x s152, r34 3x long s138, r50 3x long s153, r34 3x s132), decoded with the calibration of their four validation twins (`outputs/twins4dec.json`) | twins 0.7661 | 0.78152 (new best) | submission 15 |
+| 2026-10-21 | context-aware recalibration: LightGBM on the blended probability plus neighbourhood, rain inputs, location, hour (`src/stack_calibrate.py`), lead 3, alternate weeks | 0.6866 vs 0.6896 for isotonic | | rejected: it leans on latitude and longitude, which do not transfer between weeks; the simple isotonic table stays |
 
 From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
+
+GPU budget (2026-10-21, from `kaggle quota`): 18.71 h used and 11.29 h left of 30 h at 03:39 UTC; refresh on Saturday 2026-10-24 at 00:00 UTC. Colombe's rule: use the GPU fully but pace it so the quota runs out only a few hours before the refresh, never early. Plan: running now r50 long full-data (s153) and up3 full-data (s132); queue (checks `kaggle quota` before each push, 1 h floor) U-Net++ full-data (s139, about 3.5 h), up3-loss full-data (s136, about 1.2 h), effb3 full-data (s123, about 1.6 h). About 1.5 to 2 h stay in reserve for Thursday and Friday and are spent on Friday. The up4 full-data twin (about 1.9 h) moves to after the refresh.
 
 Kaggle kernel naming: the first three kernels are `indabax-rain-unet`, `indabax-rain-unet-b`, `indabax-rain-unet-c`. From the fourth on, the scheme is `indabax-unet-<encoder>-<variant>`.
 
@@ -55,3 +84,4 @@ Reading of submissions 4 and 5 (corrected): the full-data shift model (0.70337) 
 | Date | Count |
 | --- | --- |
 | 2026-10-20 | 5 |
+| 2026-10-21 | 5 |

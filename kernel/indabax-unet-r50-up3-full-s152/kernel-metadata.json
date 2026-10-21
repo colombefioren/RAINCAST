@@ -1,0 +1,15 @@
+{
+ "id": "cocofioren/indabax-unet-r50-up3-full-s152",
+ "title": "indabax-unet-r50-up3-full-s152",
+ "code_file": "indabax-unet-r50-up3-full-s152.py",
+ "language": "python",
+ "kernel_type": "script",
+ "is_private": "true",
+ "enable_gpu": "true",
+ "enable_internet": "true",
+ "dataset_sources": [],
+ "competition_sources": [
+  "hackathon-IndabaX-MDG-2026"
+ ],
+ "kernel_sources": []
+}
