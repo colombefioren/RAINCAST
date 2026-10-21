@@ -77,6 +77,11 @@ the limit resets, usually some hours later; the queue resumes where it stopped, 
 
 ## Reproduce the best submission (public 0.77372, submission 11)
 
+These runs start from ImageNet weights, which the competition rules allowed until 21 October and now
+forbid (see `docs/RULES.md`). They are kept to document the early submissions; the kernel files listed
+here were bundled before `--pretrained` existed and still load ImageNet weights. Final submissions use
+networks trained from random weights.
+
 Eight U-Nets are trained on Kaggle GPUs with the 2022-2023 season held out. Each run saves the test
 probabilities of every epoch and the validation probabilities of its last-k epoch averages.
 
