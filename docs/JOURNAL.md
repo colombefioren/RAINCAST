@@ -65,6 +65,8 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-21 | full-data r50 3x (s152, last 4) + full-data r34 3x long (s138, last 8), decoded with the calibration of their validation twins (`outputs/twins2dec.json`, twins 0.7650) | twins 0.7650 | 0.78067 (new best) | submission 14: two full-data models beat one (0.77881) |
 | 2026-10-21 | U-Net++ decoder, resnet34, 3x, 9 epochs, batch 16, TTA (`indabax-unetpp-r34-up3-long`, 2.57 GPU hours) | 0.7032 single, 0.7128 last-8 average | | best single model so far |
 | 2026-10-21 | nine validation runs (the eight 3x/4x runs + U-Net++), decoded with fixed mu (`outputs/blend22dec.json`) | 0.7670 | | best validation; U-Net++ full-data twin queued |
+| 2026-10-21 | full-data twins finished: r34 3x (s132, 0.57 GPU hours, cheaper than its validation twin because no per-epoch validation) and r50 3x long (s153) | no validation possible | | |
+| 2026-10-21 | four full-data models (r50 3x s152, r34 3x long s138, r50 3x long s153, r34 3x s132), decoded with the calibration of their four validation twins (`outputs/twins4dec.json`) | twins 0.7661 | 0.78152 (new best) | submission 15 |
 | 2026-10-21 | context-aware recalibration: LightGBM on the blended probability plus neighbourhood, rain inputs, location, hour (`src/stack_calibrate.py`), lead 3, alternate weeks | 0.6866 vs 0.6896 for isotonic | | rejected: it leans on latitude and longitude, which do not transfer between weeks; the simple isotonic table stays |
 
 From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
@@ -82,4 +84,4 @@ Reading of submissions 4 and 5 (corrected): the full-data shift model (0.70337) 
 | Date | Count |
 | --- | --- |
 | 2026-10-20 | 5 |
-| 2026-10-21 | 4 |
+| 2026-10-21 | 5 |
