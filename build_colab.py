@@ -57,11 +57,15 @@ def upload(out, name):
     up = f"/content/upload/{name}"; shutil.rmtree(up, ignore_errors=True); os.makedirs(up)
     for f in glob.glob(f"{out}/*_testprob.npy") + glob.glob(f"{out}/*.json"):
         shutil.copy(f, up)
-    for jf in glob.glob(f"{out}/*.json"):
+    jsons = glob.glob(f"{out}/*.json")
+    for jf in jsons:
         blends = json.load(open(jf)).get("epoch_blends", {})
         if blends:  # keep only the best last-k validation file (each is about 280 MB)
             k = max(blends, key=lambda b: blends[b]["val_fss"]); tag = os.path.basename(jf)[:-5]
             shutil.copy(f"{out}/{tag}_{k}_valprob.npy", up); print("best epoch blend", k, blends[k]["val_fss"])
+    if not jsons:  # the run stopped before its summary: keep every validation file and the weights
+        for f in glob.glob(f"{out}/*_valprob.npy") + glob.glob(f"{out}/*.pt"):
+            shutil.copy(f, up)
     json.dump({"title": name, "id": f"cocofioren/{name}", "licenses": [{"name": "CC0-1.0"}]}, open(f"{up}/dataset-metadata.json", "w"))
     print(sorted(os.listdir(up)), flush=True)
     if subprocess.run(f"kaggle datasets create -p {up} -q", shell=True).returncode != 0:  # private by default
@@ -92,8 +96,9 @@ while True:
     print("=" * 20, "running", slug, flush=True)
     rc = subprocess.run("set -o pipefail; python -u /content/job.py 2>&1 | grep --line-buffered -v Warning",
                         shell=True, executable="bash").returncode
-    if rc != 0 or not glob.glob(f"{out}/*_testprob.npy"):
+    if not glob.glob(f"{out}/*_testprob.npy"):
         print("job failed:", slug, "exit code", rc, flush=True); failed.add(slug); continue
+    if rc != 0: print("job stopped early:", slug, "exit code", rc, "- uploading what it saved", flush=True)
     upload(out, results_name(slug)); done.add(slug); shutil.rmtree(out, ignore_errors=True)
 ''' % JOBS
 
