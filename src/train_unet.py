@@ -11,6 +11,7 @@ p.add_argument("--data", required=True)
 p.add_argument("--out", default="outputs")
 p.add_argument("--encoder", default="resnet18")
 p.add_argument("--arch", default="Unet", choices=["Unet", "UnetPlusPlus", "FPN", "DeepLabV3Plus"], help="segmentation-models-pytorch decoder")
+p.add_argument("--attention", default="", choices=["", "scse"], help="scse: squeeze-and-excitation attention blocks in the Unet / UnetPlusPlus decoder")
 p.add_argument("--epochs", type=int, default=8)
 p.add_argument("--bs", type=int, default=32)
 p.add_argument("--lr", type=float, default=1e-3)
@@ -122,7 +123,8 @@ va_idx = np.where(val)[0]
 dl_va = torch.utils.data.DataLoader(DS(Rows(X, va_idx), Rows(y, va_idx), tf_tr[val], 0, sub(ADV, val)), batch_size=64, num_workers=2) if val.any() else None
 dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt), batch_size=64, num_workers=2)
 
-model = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet", in_channels=N_IN, classes=N_OUT).to(dev)
+extra = {"decoder_attention_type": a.attention} if a.attention else {}
+model = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet", in_channels=N_IN, classes=N_OUT, **extra).to(dev)
 if a.dropout > 0:
     model.segmentation_head = nn.Sequential(nn.Dropout2d(a.dropout), model.segmentation_head)
 if a.upscale > 1:
@@ -191,7 +193,7 @@ def tune_thresholds(prob, obs):
     return best
 
 import os; os.makedirs(a.out, exist_ok=True)
-tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
+tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
 best_score, hist, VAL_EPOCHS = -1, [], []
 for ep in range(a.epochs):
     model.train(); t0 = time.time(); tl = 0
