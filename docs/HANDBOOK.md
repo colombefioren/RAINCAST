@@ -87,8 +87,9 @@ shrink the image so later layers see bigger context.
 
 **ResNet.** A CNN design with skip connections (the input of a block is added to its output), which lets
 very deep networks train. ResNet18 and ResNet34 are the small members. "Pretrained on ImageNet" means
-the weights already know generic image features from 1.2 million photos. Even on rain maps this is a
-better start than random numbers.
+the weights already know generic image features from 1.2 million photos. That is often a better start
+than random numbers, but this competition's rules (2.5, since 21 October) forbid weights pretrained
+outside the competition data, so the final models here start from random weights.
 
 **U-Net.** An encoder (ResNet, shrinks the image and extracts features) plus a decoder (grows it back to
 full size) with skip connections between matching sizes. Output is an image the same size as the input,
@@ -155,7 +156,8 @@ notebooks and discussions. Community competitions like this one do not award med
 
 **Etiquette and rules that apply everywhere.** One account. No private code sharing between
 participants. Public sharing only through the competition's own Code and Discussion tabs. No hand
-labelling of test data. Document external data and pretrained models. Winners must be able to
+labelling of test data. Document external data and pretrained models, and check each competition's
+own rules: some allow them, this one forbids both since 21 October. Winners must be able to
 reproduce their result from code.
 
 ## 5. This project, step by step
@@ -168,15 +170,16 @@ reproduce their result from code.
    beat these.
 4. **Validation split by season**, not random: consecutive hourly samples overlap, a random split would
    leak.
-5. **Model** (`src/train_unet.py`): U-Net with a pretrained ResNet encoder, 8 input channels (3 rain
-   maps, latitude, longitude, hour of day as sin and cos, day in season), optional 3 advected maps,
+5. **Model** (`src/train_unet.py`): U-Net with a ResNet encoder (ImageNet-initialised until 21 October,
+   random weights since the rules changed, see step 12), 8 input channels (3 rain maps, two fixed
+   coordinate channels for the row and column position, hour of day as sin and cos, day in season), optional 3 advected maps,
    3 output probability maps. Loss = weighted binary cross-entropy + a soft version of FSS computed on
    probabilities, so the network trains on something close to the metric.
 6. **Regularise**: the first run overfitted after one epoch. Dropout, a lower learning rate, random
    translations of the maps and averaging the last epochs fixed it. Flips and 90 degree rotations were
    tried and hurt, because rain over Madagascar mostly moves in one direction.
-7. **Upscale the input 3x** before the encoder and average the output back down: the pretrained
-   encoder then sees rain cells at a size closer to the objects it learned on ImageNet. Best single
+7. **Upscale the input 3x** before the encoder and average the output back down: the deep layers
+   of the encoder keep a finer grid (a ResNet shrinks its input 32 times, so 128 pixels end as 4x4). Best single
    change to the network (+0.012 on validation at 2x, a little more at 3x; 4x is no better).
    Training 9 epochs instead of 6 and averaging the last epochs adds about +0.0015, and the U-Net++
    decoder (nested skip connections) another +0.003: it is the best single model.
@@ -185,7 +188,10 @@ reproduce their result from code.
    expected FSS, instead of one threshold per lead time. Biggest single gain of the project (about
    +0.05 on held-out data). See the question "How do you turn probabilities into the final map?" below.
 10. **Submit** (`src/make_submission.py`), log every run in `docs/JOURNAL.md`.
-11. **Final**: select two final submissions by validation score.
+11. **Final**: select two final submissions by validation score, by hand, among the rule-compliant ones.
+12. **Rule change** (21 October): the organisers changed the rules to forbid external data and
+    pretrained weights. Every final model is retrained from random weights. The ImageNet-based
+    submissions stay on the leaderboard but are never selected. See `docs/RULES.md`.
 
 ## 6. Explaining the work in your own words
 
@@ -193,7 +199,8 @@ Practise these aloud. They are what a jury or an organiser asks.
 
 **What does your model do?** It takes three hourly rain maps and predicts, for each pixel, the
 probability of rain above 1 mm/h one, two and three hours later. It is an ensemble of U-Net and U-Net++
-networks with ResNet34 and ResNet50 encoders pretrained on ImageNet, fed the maps upscaled 3x. Their
+networks with ResNet encoders, trained from random weights on the competition data only, fed the
+maps upscaled 3x. Their
 averaged probabilities are calibrated and turned into the final rain map by a decoder that maximises
 the expected FSS.
 
@@ -258,9 +265,18 @@ step (1.05 s to 0.52 s), so twice as many experiments fit in the same GPU quota.
 24 million parameter network memorised them after one epoch. Augmentation, dropout, a lower learning
 rate and epoch ensembling fixed it.
 
-**What external resources did you use?** ImageNet-pretrained encoder weights from the
-segmentation-models-pytorch library (MIT licence), OpenCV for optical flow, PyTorch. No external data.
-An AI coding assistant helped write and debug the scripts; every script was run and checked by me.
+**What external resources did you use?** None in the final models: the rules forbid external data and
+pretrained weights. The networks start from random weights and learn only from `train.npz`. Software:
+PyTorch, segmentation-models-pytorch (for the architectures only), NumPy, SciPy, pandas, scikit-learn;
+GPUs from Kaggle Notebooks and Google Colab. My first fifteen submissions used ImageNet-pretrained
+encoders, which the rules allowed when I made them; the rules changed on 21 October, so those are not
+selected as final. An AI coding assistant helped write and debug the scripts; every script was run and
+checked by me.
+
+**Why do you feed coordinates to the network?** Rain depends on place: mountains, coast, sea. Two
+fixed channels give the row and column of each pixel, the same for every sample (the CoordConv
+technique). They contain nothing from any sample, so each forecast still reads only its own three maps
+and its timestamp, as the rules require.
 
 **How is it reproducible?** Fixed seeds, pinned requirements, one command per step in the README,
 every run logged with its validation and leaderboard score.

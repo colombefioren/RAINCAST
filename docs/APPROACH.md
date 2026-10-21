@@ -34,9 +34,12 @@ growth/decay of rain cells.
 
 ## Model
 
-- U-Net (`segmentation-models-pytorch`) with an ImageNet-pretrained ResNet encoder.
-- Inputs, 8 channels: the three rain maps as log1p(rain)/2, latitude and longitude grids
-  (standardised), sin and cos of the hour, and the position within the rainy season.
+- U-Net and U-Net++ (`segmentation-models-pytorch`) with a ResNet encoder, trained from random weights. Since
+  21 October the rules forbid weights pretrained outside the competition data; submissions 1 to 15 used
+  ImageNet initialisation, which the rules allowed until then (see `docs/RULES.md`).
+- Inputs, 8 channels: the three rain maps as log1p(rain)/2, two fixed coordinate channels (standardised
+  row and column index, the CoordConv technique; they equal the standardised latitude and longitude
+  grids), sin and cos of the hour, and the position within the rainy season.
 - Outputs, 3 channels: probability of rain above 1 mm/h at +1h, +2h, +3h.
 - Loss: binary cross-entropy with positive weight 8 (rain is rare) plus a soft FSS loss, which is the
   metric itself computed on probabilities instead of binary masks, so the network optimises what is
@@ -50,7 +53,7 @@ growth/decay of rain cells.
   bilinearly enlarged from 128x128 to 256x256 before the encoder, and the 3 output maps are averaged
   back down to 128x128. A ResNet shrinks its input 32 times, so a 128-pixel map becomes a 4x4 grid at
   the bottom of the U-Net; at 256 pixels the grid is 8x8 and the first layers see rain cells that span
-  more pixels, closer to the object sizes the ImageNet weights were trained on.
+  more pixels, so more spatial detail reaches the deep layers.
 - Epoch averaging: the test probabilities of the last 5 epochs are averaged, which beats the single
   best checkpoint by about +0.004 because each epoch makes slightly different mistakes.
 - Thresholds are tuned per lead time on the held-out season (Dec 2022 to Mar 2023), from the averaged
