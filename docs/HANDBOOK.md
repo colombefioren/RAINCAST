@@ -248,6 +248,12 @@ The calibration table and the decoder setting fitted on the twins are applied to
 A paired test on the public leaderboard (same model, same calibration, only the training seasons
 differ) showed +0.006 for the full-data version.
 
+**What is mixed precision?** Numbers on a GPU are normally stored with 32 bits. Mixed precision
+runs most of the network with 16-bit numbers, which the T4's tensor cores process much faster, while
+the loss and the weight updates stay in 32 bits. A loss scaler multiplies the loss before the backward
+pass so that small gradients do not round to zero in 16 bits. Here it halved the time per training
+step (1.05 s to 0.52 s), so twice as many experiments fit in the same GPU quota.
+
 **What was the hardest problem?** Overfitting. Ten thousand hourly samples are highly correlated, so a
 24 million parameter network memorised them after one epoch. Augmentation, dropout, a lower learning
 rate and epoch ensembling fixed it.
