@@ -78,6 +78,9 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-21 | eight runs without effb3-up3 | 0.7668 | | within noise of the others |
 | 2026-10-21 | three long runs with U-Net++ weighted double (`outputs/long3w112dec.json`) | 0.76712 vs 0.76700 equal weights | | +0.0001: a second U-Net++ seed is worth only a few ten-thousandths; a clearly better single model is needed for real gains |
 | 2026-10-21 | U-Net++ seed 41 validation run on Colab (T4 GPU) | running | | first Colab run; a second U-Net++ is the most promising new ensemble member |
+| 2026-10-21 | U-Net++ full-data twin finished (`indabax-unetpp-r34-up3-long-full-s139`, 689 s per epoch, 1.8 GPU hours), last 8 average | no validation possible | | test probabilities correlate 0.985 with its validation twin; three-long-model submission built (`outputs/sub17_full3long_decoded.csv`) |
+| 2026-10-21 | mixed precision check (`--amp 1`): U-Net++ r34 3x, 1/8 of an epoch, Kaggle Tesla T4 | 0.6326 after 62 steps, no overflow | | 0.52 s per step against about 1.05 s in float32: training is twice as fast, so every later run uses `--amp 1` |
+| 2026-10-21 | three mixed-precision U-Net++ variants bundled: squeeze-and-excitation attention (s43, Kaggle), 12 epochs (s44, Colab), resnet50 encoder (s45, Colab) | queued | | each tests one way to get a better single model |
 
 Superseded by submission 13 (full-data training is worth about +0.006 once decoded). Original note: from now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
