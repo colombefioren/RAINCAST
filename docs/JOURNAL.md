@@ -64,8 +64,11 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-21 | full-data twins queued: r34 long s138, effb3 s123, up3-loss s136, up3 s132, up4 s134, r50 long s153 (pushed by a queue script as GPU slots free) | running | | final ensemble = mean of full-data test probabilities, decoded with the calibration of the matching validation blend |
 | 2026-10-21 | full-data r50 3x (s152, last 4) + full-data r34 3x long (s138, last 8), decoded with the calibration of their validation twins (`outputs/twins2dec.json`, twins 0.7650) | twins 0.7650 | 0.78067 (new best) | submission 14: two full-data models beat one (0.77881) |
 | 2026-10-21 | U-Net++ decoder, resnet34, 3x, 9 epochs, batch 16 (`indabax-unetpp-r34-up3-long`) | running | | decoder-architecture diversity |
+| 2026-10-21 | context-aware recalibration: LightGBM on the blended probability plus neighbourhood, rain inputs, location, hour (`src/stack_calibrate.py`), lead 3, alternate weeks | 0.6866 vs 0.6896 for isotonic | | rejected: it leans on latitude and longitude, which do not transfer between weeks; the simple isotonic table stays |
 
 From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
+
+GPU budget (2026-10-21 03:39 UTC, from `kaggle quota`): 18.71 h used, 11.29 h left of 30 h, refresh on Saturday 2026-10-24 at 00:00 UTC. Colombe asked to keep the quota lasting until the refresh. Plan: finish the two running kernels (about 3.5 h), run only the two cheapest full-data twins (up3 s132 about 1.0 h, up3-loss s136 about 1.2 h) through a queue that checks the quota before each push and keeps a 5.5 h reserve, and move the expensive twins (effb3 about 1.6 h, up4 about 1.9 h) to after the refresh.
 
 Kaggle kernel naming: the first three kernels are `indabax-rain-unet`, `indabax-rain-unet-b`, `indabax-rain-unet-c`. From the fourth on, the scheme is `indabax-unet-<encoder>-<variant>`.
 
