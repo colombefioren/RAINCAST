@@ -12,6 +12,8 @@ p.add_argument("--out", default="outputs")
 p.add_argument("--encoder", default="resnet18")
 p.add_argument("--arch", default="Unet", choices=["Unet", "UnetPlusPlus", "FPN", "DeepLabV3Plus"], help="segmentation-models-pytorch decoder")
 p.add_argument("--attention", default="", choices=["", "scse"], help="scse: squeeze-and-excitation attention blocks in the Unet / UnetPlusPlus decoder")
+p.add_argument("--pretrained", type=int, default=0, help="1: start the encoder from ImageNet weights. The rules forbid weights pretrained "
+               "outside the competition data since they changed after 20 October, so this only reproduces earlier runs")
 p.add_argument("--epochs", type=int, default=8)
 p.add_argument("--bs", type=int, default=32)
 p.add_argument("--lr", type=float, default=1e-3)
@@ -128,7 +130,7 @@ dl_va = torch.utils.data.DataLoader(DS(Rows(X, va_idx), Rows(y, va_idx), tf_tr[v
 dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt), batch_size=a.eval_bs, num_workers=2)
 
 extra = {"decoder_attention_type": a.attention} if a.attention else {}
-model = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet", in_channels=N_IN, classes=N_OUT, **extra).to(dev)
+model = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet" if a.pretrained else None, in_channels=N_IN, classes=N_OUT, **extra).to(dev)
 if a.dropout > 0:
     model.segmentation_head = nn.Sequential(nn.Dropout2d(a.dropout), model.segmentation_head)
 if a.upscale > 1:
