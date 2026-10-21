@@ -32,11 +32,14 @@ p.add_argument("--save_each", action="store_true", help="save test/val probs at 
 p.add_argument("--upscale", type=int, default=1, help="2: upsample inputs 2x before the encoder, downsample logits back")
 p.add_argument("--aux_reg", type=float, default=0.0, help="weight of an auxiliary head regressing log1p(rain)/2 at each lead (multi-task)")
 p.add_argument("--tta", type=int, default=0, help="1: average predictions over 8-pixel shifted copies (up, down, left, right)")
+p.add_argument("--amp", type=int, default=0, help="1: mixed precision (float16 forward pass with loss scaling) on GPU, faster and lighter")
 p.add_argument("--advect", type=int, default=0, help="1: add optical-flow advected maps (+1h,+2h,+3h) as input channels")
 a = p.parse_args()
 torch.manual_seed(a.seed); np.random.seed(a.seed); torch.set_num_threads(a.threads)
 dev = "cuda" if torch.cuda.is_available() else "cpu"
-print("device", dev, flush=True)
+print("device", dev, torch.cuda.get_device_name(0) if dev == "cuda" else "", flush=True)
+AMP = bool(a.amp) and dev == "cuda"
+def autocast(): return torch.autocast(device_type="cuda" if AMP else "cpu", dtype=torch.float16, enabled=AMP)
 
 import os, glob
 if not os.path.exists(f"{a.data}/train.npz"):  # Kaggle sometimes mounts competition data under another path
@@ -138,6 +141,7 @@ opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
 steps = a.epochs * len(dl_tr)
 sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=steps, pct_start=0.15)
 pos_w = torch.tensor([a.pos_w], device=dev)
+scaler = torch.cuda.amp.GradScaler(enabled=AMP)  # rescales the loss so float16 gradients do not underflow
 
 LEAD_W = torch.tensor([1.0, 1.0, 1.0], device=dev)
 def soft_fss_loss(logits, tgt, k=3, lead_w=LEAD_W):
@@ -178,7 +182,8 @@ def predict(dl):
         for xb, _ in dl:
             xb = xb.to(dev); acc = 0; cnt = 0
             for dy, dx in VIEWS:
-                acc = acc + tshift(torch.sigmoid(model(tshift(xb, dy, dx))[:, :3]), -dy, -dx)
+                with autocast(): logits = model(tshift(xb, dy, dx))
+                acc = acc + tshift(torch.sigmoid(logits[:, :3].float()), -dy, -dx)
                 cnt = cnt + tshift(tshift(torch.ones_like(xb[:, :1]), dy, dx), -dy, -dx)
             out.append((acc / cnt.clamp(min=1)).cpu().numpy())
     return np.concatenate(out)
@@ -199,9 +204,9 @@ for ep in range(a.epochs):
     model.train(); t0 = time.time(); tl = 0
     for i, (xb, yb) in enumerate(dl_tr):
         xb, yb = xb.to(dev), yb.to(dev)
-        logits = model(xb)
-        loss = total_loss(logits, yb)
-        opt.zero_grad(); loss.backward(); opt.step(); sched.step(); tl += loss.item()
+        with autocast(): logits = model(xb)
+        loss = total_loss(logits.float(), yb)  # loss in float32 even with --amp
+        opt.zero_grad(); scaler.scale(loss).backward(); scaler.step(opt); scaler.update(); sched.step(); tl += loss.item()
         if i % 50 == 0: print(f"ep{ep} it{i}/{len(dl_tr)} loss {loss.item():.4f} {time.time()-t0:.0f}s", flush=True)
     msg = f"epoch {ep} train_loss {tl/len(dl_tr):.4f} time {time.time()-t0:.0f}s"
     if dl_va is not None:
