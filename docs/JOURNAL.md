@@ -54,7 +54,10 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-21 | seven-model blend (adds r50-up3), equal weights, decoded with fixed mu (`outputs/blend17dec.json`) | 0.7650 | ready as `sub10` | predicted public about 0.775; first submission of 21 October |
 | 2026-10-21 | efficientnet-b3, 3x upscale, batch 16 (batch 32 ran out of GPU memory), TTA (`indabax-unet-effb3-up3`) | 0.6997 single, 0.7057 last-5 average | | |
 | 2026-10-21 | eight-model blend (adds effb3-up3), equal weights, decoded with fixed mu (`outputs/blend18dec.json`) | 0.7655 | 0.77372 (first place, +0.044 over the next team) | submission 11; validation to public offset +0.008, in line with the +0.010 seen with thresholds |
-| 2026-10-21 | resnet34 3x for 9 epochs (`indabax-unet-r34-up3-long`) | running | | does longer training help? |
+| 2026-10-21 | resnet34 3x for 9 epochs, TTA (`indabax-unet-r34-up3-long`) | 0.7001 single, 0.7097 last-8 average | | best single model: longer training plus a longer epoch average helps by about +0.0015; resnet50 version launched (`indabax-unet-r50-up3-long`) |
+| 2026-10-21 | nine-model blend (adds r34-up3-long), decoded with fixed mu | 0.7658 | | |
+| 2026-10-21 | seven models without the two 2x runs, decoded with fixed mu (`outputs/blend20dec.json`) | 0.7661 | not submitted | best validation so far, but within noise of the submitted 0.7655; not worth a submission |
+| 2026-10-21 | resnet50 3x on all seasons, TTA (`indabax-unet-r50-up3-full-s152`) | running | | to test full-data models inside the decoded ensemble, borrowing calibration from the validation twin |
 
 From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
