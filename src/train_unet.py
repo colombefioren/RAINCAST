@@ -51,7 +51,6 @@ if not os.path.exists(f"{a.data}/train.npz"):  # Kaggle sometimes mounts competi
     if found: a.data = os.path.dirname(found[0])
 tr = np.load(f"{a.data}/train.npz"); te = np.load(f"{a.data}/test.npz")
 X, y, times = tr["X"], tr["y"], tr["times"]; Xt, tt = te["X"], te["times"]
-lats, lons = tr["lats"], tr["lons"]
 if a.limit: X, y, times = X[:a.limit], y[:a.limit], times[:a.limit]
 ts = pd.to_datetime(times); tst = pd.to_datetime(tt)
 val = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")) if not a.full else np.zeros(len(ts), bool)
@@ -60,8 +59,12 @@ ADV, ADVt = (advect_batch(X), advect_batch(Xt)) if a.advect else (None, None)
 if a.advect: print("advected inputs ready", ADV.shape, flush=True)
 N_IN = 8 + (3 if a.advect else 0)
 N_OUT = 6 if a.aux_reg > 0 else 3
-lat_c = ((lats - lats.mean()) / lats.std()).astype(np.float32)
-lon_c = ((lons - lons.mean()) / lons.std()).astype(np.float32)
+# fixed coordinate channels (CoordConv): standardised row and column index, the same for every sample, so the
+# network can learn location-dependent behaviour while each forecast reads only its three rain maps and its
+# timestamp. They equal the standardised latitude and longitude grids of the data files to within 1e-6.
+ramp = (np.arange(X.shape[-1]) - (X.shape[-1] - 1) / 2) / np.arange(X.shape[-1]).std()
+row_c = np.repeat(ramp[:, None], X.shape[-1], 1).astype(np.float32)
+col_c = np.repeat(ramp[None, :], X.shape[-1], 0).astype(np.float32)
 
 def time_feats(t):
     h = t.hour.values + t.minute.values / 60.0
@@ -87,14 +90,14 @@ class DS(torch.utils.data.Dataset):
         x = np.log1p(np.maximum(self.X[i], 0)) / 2.0  # (3,H,W)
         H, W = x.shape[1:]
         tfe = np.broadcast_to(self.tf[i][:, None, None], (3, H, W))
-        parts = [x, lat_c[None], lon_c[None], tfe]
+        parts = [x, row_c[None], col_c[None], tfe]
         if self.adv is not None: parts.append(np.log1p(np.maximum(self.adv[i], 0)) / 2.0)
         inp = np.concatenate(parts, 0).astype(np.float32)
         tgt = self.target(i) if self.y is not None else np.zeros((N_OUT, H, W), np.float32)
         if self.mixup > 0 and self.y is not None and i + 1 < len(self.X) and np.random.rand() < self.mixup:
             lam = np.random.rand()
             x2 = np.log1p(np.maximum(self.X[i + 1], 0)) / 2.0
-            parts2 = [x2, lat_c[None], lon_c[None], np.broadcast_to(self.tf[i + 1][:, None, None], (3, H, W))]
+            parts2 = [x2, row_c[None], col_c[None], np.broadcast_to(self.tf[i + 1][:, None, None], (3, H, W))]
             if self.adv is not None: parts2.append(np.log1p(np.maximum(self.adv[i + 1], 0)) / 2.0)
             inp = lam * inp + (1 - lam) * np.concatenate(parts2, 0).astype(np.float32)
             tgt = lam * tgt + (1 - lam) * self.target(i + 1)
