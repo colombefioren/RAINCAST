@@ -32,6 +32,7 @@ p.add_argument("--save_each", action="store_true", help="save test/val probs at 
 p.add_argument("--upscale", type=int, default=1, help="2: upsample inputs 2x before the encoder, downsample logits back")
 p.add_argument("--aux_reg", type=float, default=0.0, help="weight of an auxiliary head regressing log1p(rain)/2 at each lead (multi-task)")
 p.add_argument("--tta", type=int, default=0, help="1: average predictions over 8-pixel shifted copies (up, down, left, right)")
+p.add_argument("--eval_bs", type=int, default=64, help="batch size for validation and test predictions (lower it if they run out of GPU memory)")
 p.add_argument("--amp", type=int, default=0, help="1: mixed precision (float16 forward pass with loss scaling) on GPU, faster and lighter")
 p.add_argument("--advect", type=int, default=0, help="1: add optical-flow advected maps (+1h,+2h,+3h) as input channels")
 a = p.parse_args()
@@ -123,8 +124,8 @@ if a.wet_sampling:
 else:
     dl_tr = torch.utils.data.DataLoader(ds_tr, batch_size=a.bs, shuffle=True, num_workers=2, drop_last=True)
 va_idx = np.where(val)[0]
-dl_va = torch.utils.data.DataLoader(DS(Rows(X, va_idx), Rows(y, va_idx), tf_tr[val], 0, sub(ADV, val)), batch_size=64, num_workers=2) if val.any() else None
-dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt), batch_size=64, num_workers=2)
+dl_va = torch.utils.data.DataLoader(DS(Rows(X, va_idx), Rows(y, va_idx), tf_tr[val], 0, sub(ADV, val)), batch_size=a.eval_bs, num_workers=2) if val.any() else None
+dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt), batch_size=a.eval_bs, num_workers=2)
 
 extra = {"decoder_attention_type": a.attention} if a.attention else {}
 model = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet", in_channels=N_IN, classes=N_OUT, **extra).to(dev)
