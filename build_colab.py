@@ -11,8 +11,12 @@ notebook downloads the queue, runs every job whose results are not on Kaggle yet
 results as a private Kaggle dataset cocofioren/indabax-colab-<slug>. Fetch them locally with
 `kaggle datasets download -d cocofioren/indabax-colab-<slug> -p outputs/<dir> --unzip`. Datasets use no GPU quota.
 
+The queue also holds worker.py, the same worker as plain Python, for any Linux machine with a GPU and the
+environment variable KAGGLE_API_TOKEN, such as a Saturn Cloud job. Its whole start command is SATURN_COMMAND.
+
 Credentials: the Kaggle API token is read from a Colab secret named KAGGLE_API_TOKEN, which the account owner
-adds once (key icon in the left sidebar). It is never written into a notebook or a dataset.
+adds once (key icon in the left sidebar), or on Saturn Cloud from a secret attached to the job as the
+environment variable KAGGLE_API_TOKEN. It is never written into a notebook, a command or a dataset.
 """
 import json, os, subprocess, sys, tempfile
 
@@ -38,7 +42,7 @@ def code(text): return {"cell_type": "code", "metadata": {}, "execution_count": 
 
 SETUP = [
     code("!nvidia-smi -L\n!pip -q install -U kaggle segmentation-models-pytorch"),
-    code("import os, pathlib\nfrom google.colab import userdata\n"
+    code("import os, pathlib\nfrom google.colab import userdata\nROOT = '/content'\n"
          "tok = userdata.get('KAGGLE_API_TOKEN').strip()\n"
          "d = pathlib.Path.home() / '.kaggle'; d.mkdir(exist_ok=True)\n"
          "(d / 'access_token').write_text(tok); os.chmod(d / 'access_token', 0o600)\n"
@@ -50,11 +54,28 @@ SETUP = [
          "!cd /content/data && for z in *.zip; do [ -e \"$z\" ] && unzip -o -q \"$z\" && rm \"$z\"; done; ls -la /content/data"),
 ]
 
-# Shared by both notebooks: copy a finished run's test probabilities, its json and its best last-k
+# worker.py (Saturn Cloud or any Linux GPU machine): the token comes from the environment and everything
+# lives under ~/indabax. The start command installs the packages and fetches the queue that holds worker.py.
+SATURN_COMMAND = ("pip -q install -U kaggle segmentation-models-pytorch && mkdir -p ~/.kaggle ~/indabax && "
+                  "printf %s \"$KAGGLE_API_TOKEN\" > ~/.kaggle/access_token && chmod 600 ~/.kaggle/access_token && "
+                  f"kaggle datasets download -d {JOBS} -p ~/indabax/queue --unzip -o -q && python -u ~/indabax/queue/worker.py")
+SETUP_PY = '''import glob, os, subprocess, zipfile
+ROOT = os.path.expanduser("~/indabax")
+assert os.environ.get("KAGGLE_API_TOKEN", "").strip(), "the Kaggle API token must be in the environment variable KAGGLE_API_TOKEN"
+os.makedirs(f"{ROOT}/data", exist_ok=True); os.makedirs(f"{ROOT}/out", exist_ok=True)
+for f in ["train.npz", "test.npz"]:
+    if not os.path.exists(f"{ROOT}/data/{f}"):
+        subprocess.run(f"kaggle competitions download -c hackathon-IndabaX-MDG-2026 -f {f} -p {ROOT}/data", shell=True, check=True)
+for z in glob.glob(f"{ROOT}/data/*.zip"):
+    zipfile.ZipFile(z).extractall(f"{ROOT}/data"); os.remove(z)
+print(sorted(os.listdir(f"{ROOT}/data")), flush=True)
+'''
+
+# Shared by the notebooks and worker.py: copy a finished run's test probabilities, its json and its best last-k
 # validation file into a folder, then create (or version) the private results dataset.
 UPLOAD_FN = '''import glob, json, os, shutil, subprocess
 def upload(out, name):
-    up = f"/content/upload/{name}"; shutil.rmtree(up, ignore_errors=True); os.makedirs(up)
+    up = f"{ROOT}/upload/{name}"; shutil.rmtree(up, ignore_errors=True); os.makedirs(up)
     for f in glob.glob(f"{out}/*_testprob.npy") + glob.glob(f"{out}/*.json"):
         shutil.copy(f, up)
     jsons = glob.glob(f"{out}/*.json")
@@ -74,7 +95,7 @@ def upload(out, name):
 '''
 
 WORKER_LOOP = '''import torch
-assert torch.cuda.is_available(), "No GPU: Runtime > Change runtime type > T4 GPU, then Run all again"
+assert torch.cuda.is_available(), "No GPU: on Colab, Runtime > Change runtime type > T4 GPU; on Saturn, a T4 instance size"
 JOBS = "%s"
 def results_name(slug): return ("indabax-colab-" + slug.removeprefix("indabax-"))[:50]
 def uploaded(slug):
@@ -82,19 +103,20 @@ def uploaded(slug):
     return "ready" in r.stdout.lower()
 done, failed = set(), set()
 while True:
-    shutil.rmtree("/content/jobs", ignore_errors=True)
-    if subprocess.run(f"kaggle datasets download -d {JOBS} -p /content/jobs --unzip -o -q", shell=True).returncode != 0:
+    shutil.rmtree(f"{ROOT}/jobs", ignore_errors=True)
+    if subprocess.run(f"kaggle datasets download -d {JOBS} -p {ROOT}/jobs --unzip -o -q", shell=True).returncode != 0:
         print("could not download the job queue"); break
-    queue = json.load(open("/content/jobs/jobs.json"))
+    queue = json.load(open(f"{ROOT}/jobs/jobs.json"))
     todo = [s for s in queue if s not in done and s not in failed and not uploaded(s)]
     print("jobs left:", todo, flush=True)
     if not todo:
-        print("all jobs done: the runtime can be closed (Runtime > Disconnect and delete runtime)"); break
-    slug = todo[0]; out = f"/content/out/{slug}"; shutil.rmtree(out, ignore_errors=True)
-    script = open(f"/content/jobs/{slug}.py").read().replace("--out /content/out", f"--out {out}", 1)
-    open("/content/job.py", "w").write(script)
+        print("all jobs done: stop the runtime (Colab: Runtime > Disconnect and delete runtime; Saturn: Stop)"); break
+    slug = todo[0]; out = f"{ROOT}/out/{slug}"; shutil.rmtree(out, ignore_errors=True)
+    script = open(f"{ROOT}/jobs/{slug}.py").read()  # queued scripts use Colab paths
+    script = script.replace("--data /content/data", f"--data {ROOT}/data", 1).replace("--out /content/out", f"--out {out}", 1)
+    open(f"{ROOT}/job.py", "w").write(script)
     print("=" * 20, "running", slug, flush=True)
-    rc = subprocess.run("set -o pipefail; python -u /content/job.py 2>&1 | grep --line-buffered -v Warning",
+    rc = subprocess.run(f"set -o pipefail; python -u {ROOT}/job.py 2>&1 | grep --line-buffered -v Warning",
                         shell=True, executable="bash").returncode
     if not glob.glob(f"{out}/*_testprob.npy"):
         print("job failed:", slug, "exit code", rc, flush=True); failed.add(slug); continue
@@ -149,6 +171,7 @@ def jobs(slugs):
         for s in slugs:
             open(f"{d}/{s}.py", "w").write(colab_script(s))
         json.dump(slugs, open(f"{d}/jobs.json", "w"))
+        open(f"{d}/worker.py", "w").write(SETUP_PY + UPLOAD_FN + WORKER_LOOP)
         json.dump({"title": "indabax-colab-jobs", "id": JOBS, "licenses": [{"name": "CC0-1.0"}]},
                   open(f"{d}/dataset-metadata.json", "w"))
         exists = subprocess.run(["kaggle", "datasets", "status", JOBS], capture_output=True, text=True)
