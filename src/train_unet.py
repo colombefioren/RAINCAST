@@ -37,12 +37,26 @@ p.add_argument("--tta", type=int, default=0, help="1: average predictions over 8
 p.add_argument("--eval_bs", type=int, default=64, help="batch size for validation and test predictions (lower it if they run out of GPU memory)")
 p.add_argument("--amp", type=int, default=0, help="1: mixed precision (float16 forward pass with loss scaling) on GPU, faster and lighter")
 p.add_argument("--advect", type=int, default=0, help="1: add optical-flow advected maps (+1h,+2h,+3h) as input channels")
+p.add_argument("--xla", type=int, default=0, help="1: train on one TPU chip through PyTorch/XLA (Kaggle TPU v5e-8); "
+               "--amp 1 then means bfloat16 autocast, which needs no loss scaling")
 a = p.parse_args()
 torch.manual_seed(a.seed); np.random.seed(a.seed); torch.set_num_threads(a.threads)
-dev = "cuda" if torch.cuda.is_available() else "cpu"
+if a.xla:
+    import torch_xla.core.xla_model as xm
+    import torch_xla.distributed.parallel_loader as pl
+    dev = xm.xla_device()
+else:
+    dev = "cuda" if torch.cuda.is_available() else "cpu"
 print("device", dev, torch.cuda.get_device_name(0) if dev == "cuda" else "", flush=True)
 AMP = bool(a.amp) and dev == "cuda"
-def autocast(): return torch.autocast(device_type="cuda" if AMP else "cpu", dtype=torch.float16, enabled=AMP)
+BF16 = bool(a.amp) and bool(a.xla)
+def autocast():
+    if a.xla: return torch.autocast(device_type="xla", dtype=torch.bfloat16, enabled=BF16)
+    return torch.autocast(device_type="cuda" if AMP else "cpu", dtype=torch.float16, enabled=AMP)
+def save_weights(path):
+    """XLA tensors must be copied to the CPU before saving; xm.save does that (every process saves its own run)."""
+    if a.xla: xm.save(model.state_dict(), path, master_only=False)
+    else: torch.save(model.state_dict(), path)
 
 import os, glob
 if not os.path.exists(f"{a.data}/train.npz"):  # Kaggle sometimes mounts competition data under another path
@@ -215,12 +229,19 @@ best_score, hist, VAL_EPOCHS = -1, [], []
 yv = y[val] if dl_va is not None else None
 for ep in range(a.epochs):
     model.train(); t0 = time.time(); tl = 0
-    for i, (xb, yb) in enumerate(dl_tr):
+    # on XLA the step is only traced here and runs at xm.mark_step(); reading the loss every step would make
+    # the host wait for the device, so the epoch loss is summed on the device instead
+    for i, (xb, yb) in enumerate(pl.MpDeviceLoader(dl_tr, dev) if a.xla else dl_tr):
         xb, yb = xb.to(dev), yb.to(dev)
         with autocast(): logits = model(xb)
         loss = total_loss(logits.float(), yb)  # loss in float32 even with --amp
-        opt.zero_grad(); scaler.scale(loss).backward(); scaler.step(opt); scaler.update(); sched.step(); tl += loss.item()
+        opt.zero_grad(); scaler.scale(loss).backward(); scaler.step(opt); scaler.update(); sched.step()
+        if a.xla:
+            tl = tl + loss.detach(); xm.mark_step()
+        else:
+            tl += loss.item()
         if i % 50 == 0: print(f"ep{ep} it{i}/{len(dl_tr)} loss {loss.item():.4f} {time.time()-t0:.0f}s", flush=True)
+    tl = float(tl)
     msg = f"epoch {ep} train_loss {tl/len(dl_tr):.4f} time {time.time()-t0:.0f}s"
     if dl_va is not None:
         pv = predict(dl_va)
@@ -228,9 +249,9 @@ for ep in range(a.epochs):
         msg += f" val_fss@0.5 {s05:.4f} @0.3 {s03:.4f}"
         score = max(s05, s03)
         if score > best_score:
-            best_score = score; torch.save(model.state_dict(), f"{a.out}/{tag}.pt"); np.save(f"{a.out}/{tag}_valprob.npy", pv.astype(np.float16))
+            best_score = score; save_weights(f"{a.out}/{tag}.pt"); np.save(f"{a.out}/{tag}_valprob.npy", pv.astype(np.float16))
     else:
-        torch.save(model.state_dict(), f"{a.out}/{tag}.pt")
+        save_weights(f"{a.out}/{tag}.pt")
     print(msg, flush=True); hist.append(msg)
     if a.save_each:
         np.save(f"{a.out}/{tag}_ep{ep}_testprob.npy", predict(dl_te).astype(np.float16))
