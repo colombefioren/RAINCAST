@@ -175,9 +175,11 @@ reproduce their result from code.
 6. **Regularise**: the first run overfitted after one epoch. Dropout, a lower learning rate, random
    translations of the maps and averaging the last epochs fixed it. Flips and 90 degree rotations were
    tried and hurt, because rain over Madagascar mostly moves in one direction.
-7. **Upscale the input 2x** before the encoder and average the output back down: the pretrained
+7. **Upscale the input 3x** before the encoder and average the output back down: the pretrained
    encoder then sees rain cells at a size closer to the objects it learned on ImageNet. Best single
-   change to the network (+0.012 on validation).
+   change to the network (+0.012 on validation at 2x, a little more at 3x; 4x is no better).
+   Training 9 epochs instead of 6 and averaging the last epochs adds about +0.0015, and the U-Net++
+   decoder (nested skip connections) another +0.003: it is the best single model.
 8. **Blend** (`src/blend.py`): average probability maps from several runs, seeds and epochs.
 9. **Decode** (`src/fss_decode.py`): turn the probabilities into the rain mask that maximises the
    expected FSS, instead of one threshold per lead time. Biggest single gain of the project (about
@@ -190,8 +192,10 @@ reproduce their result from code.
 Practise these aloud. They are what a jury or an organiser asks.
 
 **What does your model do?** It takes three hourly rain maps and predicts, for each pixel, the
-probability of rain above 1 mm/h one, two and three hours later. It is a U-Net with a ResNet34
-encoder pretrained on ImageNet.
+probability of rain above 1 mm/h one, two and three hours later. It is an ensemble of U-Net and U-Net++
+networks with ResNet34 and ResNet50 encoders pretrained on ImageNet, fed the maps upscaled 3x. Their
+averaged probabilities are calibrated and turned into the final rain map by a decoder that maximises
+the expected FSS.
 
 **Why a U-Net?** The output is a map the same size as the input, and rain evolution depends on
 neighbouring pixels and motion. U-Nets are the standard architecture for that, used in Weather4cast
@@ -202,8 +206,21 @@ checks whether a pixel is above the threshold. Predicting amounts wastes capacit
 tuned threshold directly targets the metric.
 
 **How did you validate?** Held out the full December 2022 to March 2023 season. Random splits would
-leak because consecutive samples overlap by two hours. The validation score (0.685) tracked the public
-leaderboard (0.695).
+leak because consecutive samples overlap by two hours. The validation score tracked the public
+leaderboard all along: the public score has been the validation score plus about 0.01 (for example
+0.7655 on validation, 0.77372 public for submission 11).
+
+**Why an ensemble, and why not fifty models?** Each network makes slightly different mistakes, so the
+average of several is better than any one of them. The gain shrinks fast: one U-Net++ scores 0.7646
+decoded on validation, three long-trained networks 0.7670, and nine networks also 0.7670. Once the
+ensemble is saturated, only better single models move the score, which is why the late work trains
+U-Net++ variants rather than more copies of the same networks.
+
+**How did you manage compute?** Kaggle gives 30 GPU hours a week. Every run's cost was checked with
+`kaggle quota` and runs were queued by a script that refuses to start one if it would eat into a
+reserve, so the quota lasts until the weekly refresh. Validation runs also went to Google Colab's free
+GPU through a worker notebook that trains a queue of jobs and sends the results back as private
+Kaggle datasets.
 
 **How do you turn probabilities into the final map?** Not with a single threshold. FSS compares the
 fraction of rainy pixels in each 3x3 window of the forecast with the same fraction in the observation.
