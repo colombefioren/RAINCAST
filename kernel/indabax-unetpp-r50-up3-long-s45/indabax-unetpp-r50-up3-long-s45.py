@@ -298,21 +298,29 @@ for ep in range(a.epochs):
         np.save(f"{a.out}/{tag}_ep{ep}_testprob.npy", predict(dl_te).astype(np.float16))
         if dl_va is not None: VAL_EPOCHS.append(pv.astype(np.float16))
 
+def masks(prob, thr):
+    """Rain maps (0 or 10 mm/h) from one threshold per lead, in float32 to keep memory low."""
+    return np.stack([prob[:, j] > thr[j] for j in range(3)], 1).astype(np.float32) * np.float32(10.0)
+
 if dl_va is not None:
+    yv = y[val]
+    # free the training arrays (about 4 GB) before the epoch blends: Colab has 12.7 GB of RAM
+    del dl_tr, ds_tr, dl_va, X, y; import gc; gc.collect()
     model.load_state_dict(torch.load(f"{a.out}/{tag}.pt"))
-    pv = np.load(f"{a.out}/{tag}_valprob.npy").astype(np.float32); yv = y[val]
+    pv = np.load(f"{a.out}/{tag}_valprob.npy").astype(np.float32)
     print("tuning thresholds on validation", flush=True)
     thr = tune_thresholds(pv, yv)
-    pred = np.stack([(pv[:, k] > thr[k]) * 10.0 for k in range(3)], 1)
-    report("unet tuned", pred, yv)
+    report("unet tuned", masks(pv, thr), yv); del pv
     epoch_blends = {}
     if a.save_each and len(VAL_EPOCHS) > 1:
         # blends of the last k epochs: tells which epochs to average for the test prediction
+        acc = VAL_EPOCHS[-1].astype(np.float32)
         for k in range(2, len(VAL_EPOCHS) + 1):
-            pb = np.mean([v.astype(np.float32) for v in VAL_EPOCHS[-k:]], axis=0)
+            acc += VAL_EPOCHS[-k]  # running sum of the last k epochs, no float32 copy of each epoch
+            pb = acc / k
             print(f"blend of last {k} epochs", flush=True)
             tk = tune_thresholds(pb, yv)
-            sc = report(f"  last{k} tuned", np.stack([(pb[:, j] > tk[j]) * 10.0 for j in range(3)], 1), yv)
+            sc = report(f"  last{k} tuned", masks(pb, tk), yv)
             epoch_blends[f"last{k}"] = {"thr": tk, "val_fss": sc, "epochs": list(range(len(VAL_EPOCHS) - k, len(VAL_EPOCHS)))}
             np.save(f"{a.out}/{tag}_last{k}_valprob.npy", pb.astype(np.float16))
     json.dump({"thr": thr, "best_val": best_score, "hist": hist, "epoch_blends": epoch_blends}, open(f"{a.out}/{tag}.json", "w"), indent=1)
