@@ -29,6 +29,7 @@ p.add_argument("--dropout", type=float, default=0.0)
 p.add_argument("--stride", type=int, default=1, help="use every k-th hourly train sample")
 p.add_argument("--save_each", action="store_true", help="save test/val probs at every epoch")
 p.add_argument("--upscale", type=int, default=1, help="2: upsample inputs 2x before the encoder, downsample logits back")
+p.add_argument("--aux_reg", type=float, default=0.0, help="weight of an auxiliary head regressing log1p(rain)/2 at each lead (multi-task)")
 p.add_argument("--tta", type=int, default=0, help="1: average predictions over 8-pixel shifted copies (up, down, left, right)")
 p.add_argument("--advect", type=int, default=0, help="1: add optical-flow advected maps (+1h,+2h,+3h) as input channels")
 a = p.parse_args()
@@ -51,6 +52,7 @@ val = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")) if not a.full else 
 ADV, ADVt = (advect_batch(X), advect_batch(Xt)) if a.advect else (None, None)
 if a.advect: print("advected inputs ready", ADV.shape, flush=True)
 N_IN = 8 + (3 if a.advect else 0)
+N_OUT = 6 if a.aux_reg > 0 else 3
 lat_c = ((lats - lats.mean()) / lats.std()).astype(np.float32)
 lon_c = ((lons - lons.mean()) / lons.std()).astype(np.float32)
 
@@ -63,6 +65,11 @@ def time_feats(t):
 class DS(torch.utils.data.Dataset):
     def __init__(self, X, y, tf, aug=0, adv=None, mixup=0.0): self.X, self.y, self.tf, self.aug, self.adv, self.mixup = X, y, tf, aug, adv, mixup
     def __len__(self): return len(self.X)
+    def target(self, i):
+        """3 binary rain maps (> 1 mm/h); with --aux_reg also 3 maps of log1p(rain)/2."""
+        b = (self.y[i] > 1.0).astype(np.float32)
+        if a.aux_reg > 0: b = np.concatenate([b, (np.log1p(np.maximum(self.y[i], 0)) / 2.0).astype(np.float32)], 0)
+        return b
     def __getitem__(self, i):
         x = np.log1p(np.maximum(self.X[i], 0)) / 2.0  # (3,H,W)
         H, W = x.shape[1:]
@@ -70,14 +77,14 @@ class DS(torch.utils.data.Dataset):
         parts = [x, lat_c[None], lon_c[None], tfe]
         if self.adv is not None: parts.append(np.log1p(np.maximum(self.adv[i], 0)) / 2.0)
         inp = np.concatenate(parts, 0).astype(np.float32)
-        tgt = (self.y[i] > 1.0).astype(np.float32) if self.y is not None else np.zeros((3, H, W), np.float32)
+        tgt = self.target(i) if self.y is not None else np.zeros((N_OUT, H, W), np.float32)
         if self.mixup > 0 and self.y is not None and i + 1 < len(self.X) and np.random.rand() < self.mixup:
             lam = np.random.rand()
             x2 = np.log1p(np.maximum(self.X[i + 1], 0)) / 2.0
             parts2 = [x2, lat_c[None], lon_c[None], np.broadcast_to(self.tf[i + 1][:, None, None], (3, H, W))]
             if self.adv is not None: parts2.append(np.log1p(np.maximum(self.adv[i + 1], 0)) / 2.0)
             inp = lam * inp + (1 - lam) * np.concatenate(parts2, 0).astype(np.float32)
-            tgt = lam * tgt + (1 - lam) * (self.y[i + 1] > 1.0).astype(np.float32)
+            tgt = lam * tgt + (1 - lam) * self.target(i + 1)
         if self.aug == 1:  # rotations and flips: break the geographic motion prior, kept for reference
             k = np.random.randint(4)
             inp, tgt = np.rot90(inp, k, axes=(1, 2)), np.rot90(tgt, k, axes=(1, 2))
@@ -108,7 +115,7 @@ else:
 dl_va = torch.utils.data.DataLoader(DS(X[val], y[val], tf_tr[val], 0, sub(ADV, val)), batch_size=64, num_workers=2) if val.any() else None
 dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt), batch_size=64, num_workers=2)
 
-model = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet", in_channels=N_IN, classes=3).to(dev)
+model = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet", in_channels=N_IN, classes=N_OUT).to(dev)
 if a.dropout > 0:
     model.segmentation_head = nn.Sequential(nn.Dropout2d(a.dropout), model.segmentation_head)
 if a.upscale > 1:
@@ -137,11 +144,15 @@ def soft_csi_loss(logits, tgt):
     inter = (pr * tgt).sum(dim=(0, 2, 3)); union = pr.sum(dim=(0, 2, 3)) + tgt.sum(dim=(0, 2, 3)) - inter
     return (1 - inter / (union + 1e-6)).mean()
 def total_loss(logits, yb):
+    if a.aux_reg > 0:
+        reg = F.mse_loss(logits[:, 3:], yb[:, 3:]); logits, yb = logits[:, :3], yb[:, :3]
+    else:
+        reg = 0.0
     l = F.binary_cross_entropy_with_logits(logits, yb, pos_weight=pos_w) + a.fss_w * soft_fss_loss(logits, yb)
     if a.ms_fss:
         l = l + 0.5 * soft_fss_loss(logits, yb, 5, torch.tensor([0.5, 1.0, 1.5], device=dev)) + 0.5 * soft_fss_loss(logits, yb, 9, torch.tensor([0.25, 0.75, 2.0], device=dev))
     if a.csi_w > 0: l = l + a.csi_w * soft_csi_loss(logits, yb)
-    return l
+    return l + a.aux_reg * reg
 
 def tshift(t, dy, dx):
     """Shift (N,C,H,W) by dy, dx with zero fill, like the training translation augmentation."""
@@ -158,7 +169,7 @@ def predict(dl):
         for xb, _ in dl:
             xb = xb.to(dev); acc = 0; cnt = 0
             for dy, dx in VIEWS:
-                acc = acc + tshift(torch.sigmoid(model(tshift(xb, dy, dx))), -dy, -dx)
+                acc = acc + tshift(torch.sigmoid(model(tshift(xb, dy, dx))[:, :3]), -dy, -dx)
                 cnt = cnt + tshift(tshift(torch.ones_like(xb[:, :1]), dy, dx), -dy, -dx)
             out.append((acc / cnt.clamp(min=1)).cpu().numpy())
     return np.concatenate(out)
