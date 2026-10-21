@@ -1,0 +1,15 @@
+{
+ "id": "cocofioren/indabax-unetpp-r50-up3-long-s45",
+ "title": "indabax-unetpp-r50-up3-long-s45",
+ "code_file": "indabax-unetpp-r50-up3-long-s45.py",
+ "language": "python",
+ "kernel_type": "script",
+ "is_private": "true",
+ "enable_gpu": "true",
+ "enable_internet": "true",
+ "dataset_sources": [],
+ "competition_sources": [
+  "hackathon-IndabaX-MDG-2026"
+ ],
+ "kernel_sources": []
+}

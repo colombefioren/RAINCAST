@@ -1,0 +1,15 @@
+{
+ "id": "cocofioren/indabax-unetpp-scse-r34-up3-long-s43",
+ "title": "indabax-unetpp-scse-r34-up3-long-s43",
+ "code_file": "indabax-unetpp-scse-r34-up3-long-s43.py",
+ "language": "python",
+ "kernel_type": "script",
+ "is_private": "true",
+ "enable_gpu": "true",
+ "enable_internet": "true",
+ "dataset_sources": [],
+ "competition_sources": [
+  "hackathon-IndabaX-MDG-2026"
+ ],
+ "kernel_sources": []
+}
