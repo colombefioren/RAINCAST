@@ -53,7 +53,7 @@ What this repository does about it:
 | PyTorch | Training and inference | BSD-3-Clause |
 | segmentation-models-pytorch (with timm) | U-Net and U-Net++ architectures, built with random weights | MIT, Apache-2.0 |
 | scikit-learn | Isotonic calibration in the decoder | BSD-3-Clause |
-| Kaggle Notebooks, Google Colab and Saturn Cloud | Free T4 GPUs for training | service terms |
+| Kaggle Notebooks and Google Colab | Free T4 GPUs for training | service terms |
 | Kaggle API client | Data download, kernel runs, submissions | Apache-2.0 |
 | Claude Code (Anthropic) | AI coding assistant used during development | service terms |
 
