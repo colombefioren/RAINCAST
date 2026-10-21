@@ -210,6 +210,15 @@ own predicted probabilities, never another test sample or any test target. It is
 rewards the right amount of rain in each neighbourhood more than the exact pixel, so a speckled map
 scores well but looks less natural; an operational service should publish the probability map itself.
 
+**Why retrain on all seasons at the end, and how are those models calibrated?** A model trained
+without the 2022-2023 season can be scored on it, which is how every choice was made. Once the recipe
+is fixed, the same recipe trained on every season, including December 2023 just before the test
+months, learns from about a third more data. Those models cannot be scored locally, so each one is
+paired with its "validation twin": the same recipe and settings trained without the held-out season.
+The calibration table and the decoder setting fitted on the twins are applied to the full-data models.
+A paired test on the public leaderboard (same model, same calibration, only the training seasons
+differ) showed +0.006 for the full-data version.
+
 **What was the hardest problem?** Overfitting. Ten thousand hourly samples are highly correlated, so a
 24 million parameter network memorised them after one epoch. Augmentation, dropout, a lower learning
 rate and epoch ensembling fixed it.
