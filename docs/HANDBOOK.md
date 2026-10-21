@@ -125,6 +125,16 @@ old name, still used by the command-line tool. A script can be pushed from the t
 `kaggle kernels push`, runs on Kaggle's machines, and its outputs can be downloaded with
 `kaggle kernels output`. Private by default.
 
+**GPU quota and Google Colab.** Kaggle gives each account a weekly GPU budget (30 hours in this
+competition). A kernel spends quota for its whole run, validation included. `kaggle quota` shows the
+hours used, the hours left and the refresh time (Saturday 00:00 UTC). Google Colab is Google's version
+of the same idea: a hosted notebook with a free GPU (usually a T4 with 15 GB of memory) for a few hours
+a day, with no fixed weekly number. `build_colab.py` turns a kernel script into a Colab notebook that
+reads the Kaggle token from a Colab secret, downloads the data with the Kaggle tool, trains with the
+same script and uploads the results to a private Kaggle dataset. Datasets use no GPU quota, so the
+results come home for free with `kaggle datasets download`. Limits to know: the session stops when the
+tab closes or after about 12 hours, and the machine has about 12.7 GB of RAM.
+
 **The command-line tool.** `kaggle` reads a token from `~/.kaggle/access_token`. Commands used here:
 
 ```
@@ -136,6 +146,8 @@ kaggle competitions leaderboard -c <slug> --show
 kaggle kernels push -p <folder>                     upload and run a script on Kaggle
 kaggle kernels status <user>/<slug>
 kaggle kernels output <user>/<slug> -p <folder>     download results and log
+kaggle quota                                        GPU hours used, left, and refresh time
+kaggle datasets download -d <user>/<name> -p <folder> --unzip   download a dataset, e.g. Colab results
 ```
 
 **Progression.** Kaggle has tiers (Novice to Grandmaster) based on medals from competitions, datasets,
