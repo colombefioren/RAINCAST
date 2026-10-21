@@ -200,7 +200,14 @@ def tune_thresholds(prob, obs):
 
 import os; os.makedirs(a.out, exist_ok=True)
 tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
+def masks(prob, thr):
+    """Rain maps (0 or 10 mm/h) from one threshold per lead, in float32 to keep memory low."""
+    return np.stack([prob[:, j] > thr[j] for j in range(3)], 1).astype(np.float32) * np.float32(10.0)
+
+# per-epoch validation probabilities go to disk (VAL_EPOCHS holds file names): keeping nine of them in
+# RAM, plus the data, does not fit in Colab's 12.7 GB
 best_score, hist, VAL_EPOCHS = -1, [], []
+yv = y[val] if dl_va is not None else None
 for ep in range(a.epochs):
     model.train(); t0 = time.time(); tl = 0
     for i, (xb, yb) in enumerate(dl_tr):
@@ -211,8 +218,8 @@ for ep in range(a.epochs):
         if i % 50 == 0: print(f"ep{ep} it{i}/{len(dl_tr)} loss {loss.item():.4f} {time.time()-t0:.0f}s", flush=True)
     msg = f"epoch {ep} train_loss {tl/len(dl_tr):.4f} time {time.time()-t0:.0f}s"
     if dl_va is not None:
-        pv = predict(dl_va); yv = y[val]
-        s05 = fss_pooled((pv > 0.5) * 10.0, yv)[0]; s03 = fss_pooled((pv > 0.3) * 10.0, yv)[0]
+        pv = predict(dl_va)
+        s05 = fss_pooled(masks(pv, [0.5] * 3), yv)[0]; s03 = fss_pooled(masks(pv, [0.3] * 3), yv)[0]
         msg += f" val_fss@0.5 {s05:.4f} @0.3 {s03:.4f}"
         score = max(s05, s03)
         if score > best_score:
@@ -222,14 +229,11 @@ for ep in range(a.epochs):
     print(msg, flush=True); hist.append(msg)
     if a.save_each:
         np.save(f"{a.out}/{tag}_ep{ep}_testprob.npy", predict(dl_te).astype(np.float16))
-        if dl_va is not None: VAL_EPOCHS.append(pv.astype(np.float16))
-
-def masks(prob, thr):
-    """Rain maps (0 or 10 mm/h) from one threshold per lead, in float32 to keep memory low."""
-    return np.stack([prob[:, j] > thr[j] for j in range(3)], 1).astype(np.float32) * np.float32(10.0)
+        if dl_va is not None:
+            VAL_EPOCHS.append(f"{a.out}/{tag}_ep{ep}_valprob.npy"); np.save(VAL_EPOCHS[-1], pv.astype(np.float16))
+    if dl_va is not None: del pv
 
 if dl_va is not None:
-    yv = y[val]
     # free the training arrays (about 4 GB) before the epoch blends: Colab has 12.7 GB of RAM
     del dl_tr, ds_tr, dl_va, X, y; import gc; gc.collect()
     model.load_state_dict(torch.load(f"{a.out}/{tag}.pt"))
@@ -240,9 +244,9 @@ if dl_va is not None:
     epoch_blends = {}
     if a.save_each and len(VAL_EPOCHS) > 1:
         # blends of the last k epochs: tells which epochs to average for the test prediction
-        acc = VAL_EPOCHS[-1].astype(np.float32)
+        acc = np.load(VAL_EPOCHS[-1]).astype(np.float32)
         for k in range(2, len(VAL_EPOCHS) + 1):
-            acc += VAL_EPOCHS[-k]  # running sum of the last k epochs, no float32 copy of each epoch
+            acc += np.load(VAL_EPOCHS[-k])  # running sum of the last k epochs, one epoch in memory at a time
             pb = acc / k
             print(f"blend of last {k} epochs", flush=True)
             tk = tune_thresholds(pb, yv)
@@ -250,5 +254,6 @@ if dl_va is not None:
             epoch_blends[f"last{k}"] = {"thr": tk, "val_fss": sc, "epochs": list(range(len(VAL_EPOCHS) - k, len(VAL_EPOCHS)))}
             np.save(f"{a.out}/{tag}_last{k}_valprob.npy", pb.astype(np.float16))
     json.dump({"thr": thr, "best_val": best_score, "hist": hist, "epoch_blends": epoch_blends}, open(f"{a.out}/{tag}.json", "w"), indent=1)
+    for f in VAL_EPOCHS: os.remove(f)  # the last-k files now hold the same information
 pt = predict(dl_te); np.save(f"{a.out}/{tag}_testprob.npy", pt.astype(np.float16))
 print("saved test probs", pt.shape, flush=True)
