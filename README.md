@@ -71,6 +71,9 @@ For a single run, `python build_colab.py notebook <kernel-slug>` writes a notebo
 kernel. The token never appears in a notebook or a dataset: it is read from the secret at run time.
 Colab has about 12.7 GB of RAM, which is why `train_unet.py` indexes the training arrays instead of
 copying them.
+The free GPU also has a usage limit that Google does not publish (it was reached after about 7 hours
+of T4 time on 21 October). When it is reached the runtime stops, and Run all works again only after
+the limit resets, usually some hours later; the queue resumes where it stopped, minus the job that was cut.
 
 ## Reproduce the best submission (public 0.77372, submission 11)
 
