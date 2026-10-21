@@ -62,6 +62,12 @@ def time_feats(t):
     sd = np.where(doy > 300, doy - 335, doy + 30) / 120.0  # Dec 1 -> 0 ... Mar 31 -> ~1
     return np.stack([np.sin(2 * np.pi * h / 24), np.cos(2 * np.pi * h / 24), sd], 1).astype(np.float32)
 
+class Rows:
+    """Read-only view of arr[idx] that avoids copying (saves about 3 GB of RAM, needed on Colab)."""
+    def __init__(self, arr, idx): self.arr, self.idx = arr, idx
+    def __len__(self): return len(self.idx)
+    def __getitem__(self, i): return self.arr[self.idx[i]]
+
 class DS(torch.utils.data.Dataset):
     def __init__(self, X, y, tf, aug=0, adv=None, mixup=0.0): self.X, self.y, self.tf, self.aug, self.adv, self.mixup = X, y, tf, aug, adv, mixup
     def __len__(self): return len(self.X)
@@ -104,15 +110,16 @@ class DS(torch.utils.data.Dataset):
 tf_tr, tf_te = time_feats(ts), time_feats(tst)
 tr_idx = np.where(~val)[0][::a.stride]
 sub = lambda arr, idx: None if arr is None else arr[idx]
-ds_tr = DS(X[tr_idx], y[tr_idx], tf_tr[tr_idx], a.aug, sub(ADV, tr_idx), a.mixup)
+ds_tr = DS(Rows(X, tr_idx), Rows(y, tr_idx), tf_tr[tr_idx], a.aug, sub(ADV, tr_idx), a.mixup)
 if a.wet_sampling:
-    wet = (y[tr_idx] > 1.0).mean(axis=(1, 2, 3))
+    wet = np.array([(y[j] > 1.0).mean() for j in tr_idx])
     wts = torch.tensor(0.02 + wet / max(wet.mean(), 1e-6), dtype=torch.double)
     sampler = torch.utils.data.WeightedRandomSampler(wts, num_samples=len(tr_idx), replacement=True)
     dl_tr = torch.utils.data.DataLoader(ds_tr, batch_size=a.bs, sampler=sampler, num_workers=2, drop_last=True)
 else:
     dl_tr = torch.utils.data.DataLoader(ds_tr, batch_size=a.bs, shuffle=True, num_workers=2, drop_last=True)
-dl_va = torch.utils.data.DataLoader(DS(X[val], y[val], tf_tr[val], 0, sub(ADV, val)), batch_size=64, num_workers=2) if val.any() else None
+va_idx = np.where(val)[0]
+dl_va = torch.utils.data.DataLoader(DS(Rows(X, va_idx), Rows(y, va_idx), tf_tr[val], 0, sub(ADV, val)), batch_size=64, num_workers=2) if val.any() else None
 dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt), batch_size=64, num_workers=2)
 
 model = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet", in_channels=N_IN, classes=N_OUT).to(dev)
