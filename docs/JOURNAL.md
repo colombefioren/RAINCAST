@@ -72,10 +72,15 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-21 | context-aware recalibration: LightGBM on the blended probability plus neighbourhood, rain inputs, location, hour (`src/stack_calibrate.py`), lead 3, alternate weeks | 0.6866 vs 0.6896 for isotonic | | rejected: it leans on latitude and longitude, which do not transfer between weeks; the simple isotonic table stays |
 | 2026-10-21 | full-data twins finished: r34 3x second seed (s135, last 4); U-Net++ (s139) and r34 4x (s134) running | no validation possible | | the nine-model full-data ensemble waits for s139, s134, s136 and s123 |
 | 2026-10-21 | Google Colab support: `build_colab.py` turns a kernel script into a notebook; training now indexes the arrays instead of copying them (about 3 GB less RAM) so it fits Colab's 12.7 GB | | | first notebook: U-Net++ seed 41 validation run, waiting for the one-time Colab secret |
+| 2026-10-21 | which members matter: U-Net++ validation run alone, decoded (`outputs/single_unetpp_dec.json`) | 0.7646 | | one U-Net++ is almost as good as the four-twin blend (0.7661) |
+| 2026-10-21 | seven validation runs, without up3-loss and effb3-up3 (`outputs/blend7dec.json`) | 0.76697 vs 0.76704 for all nine | | the two runs add nothing: their full-data twins (s136, s123, 2.8 GPU hours) are cancelled, and tonight's ensemble uses seven full-data models |
+| 2026-10-21 | U-Net++ seed 41 validation run on Colab (T4 GPU) | running | | first Colab run; a second U-Net++ is the most promising new ensemble member |
 
 Superseded by submission 13 (full-data training is worth about +0.006 once decoded). Original note: from now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
 GPU budget (2026-10-21, from `kaggle quota`): 18.71 h used and 11.29 h left of 30 h at 03:39 UTC; refresh on Saturday 2026-10-24 at 00:00 UTC. Colombe's rule: use the GPU fully but pace it so the quota runs out only a few hours before the refresh, never early. Plan: running now r50 long full-data (s153) and up3 full-data (s132); queue (checks `kaggle quota` before each push, 1 h floor) U-Net++ full-data (s139, about 3.5 h), up3-loss full-data (s136, about 1.2 h), effb3 full-data (s123, about 1.6 h). About 1.5 to 2 h stay in reserve for Thursday and Friday and are spent on Friday. The up4 full-data twin (about 1.9 h) moves to after the refresh.
+
+GPU budget update (2026-10-21, 06:00 UTC): 7.4 h left. Running: U-Net++ full-data (s139) and r34 4x full-data (s134). Cancelled: up3-loss and effb3 full-data twins (no validation gain). Queued: auxiliary-head validation run (0.75 h) and a short mixed-precision speed check (about 0.15 h). About 3 h stay for Thursday and Friday and are spent on Friday, so the quota runs out only a few hours before the Saturday refresh. Colab takes the validation runs in between.
 
 Kaggle kernel naming: the first three kernels are `indabax-rain-unet`, `indabax-rain-unet-b`, `indabax-rain-unet-c`. From the fourth on, the scheme is `indabax-unet-<encoder>-<variant>`.
 
