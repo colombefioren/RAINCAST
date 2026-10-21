@@ -51,9 +51,10 @@ What this repository does about it:
 | --- | --- | --- |
 | Python 3.12, NumPy, SciPy, pandas | Data handling, metric, submission file | PSF, BSD-3-Clause |
 | PyTorch | Training and inference | BSD-3-Clause |
+| PyTorch/XLA | Training on Kaggle's TPU chips | BSD-3-Clause |
 | segmentation-models-pytorch (with timm) | U-Net and U-Net++ architectures, built with random weights | MIT, Apache-2.0 |
 | scikit-learn | Isotonic calibration in the decoder | BSD-3-Clause |
-| Kaggle Notebooks and Google Colab | Free T4 GPUs for training | service terms |
+| Kaggle Notebooks and Google Colab | Free T4 GPUs and TPU v5e chips for training | service terms |
 | Kaggle API client | Data download, kernel runs, submissions | Apache-2.0 |
 | Claude Code (Anthropic) | AI coding assistant used during development | service terms |
 
