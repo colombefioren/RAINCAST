@@ -83,8 +83,8 @@ python make_submission.py ../outputs/sub11.csv ../outputs/blend18dec.json ../out
 kaggle competitions submit -c hackathon-IndabaX-MDG-2026 -f ../outputs/sub11.csv -m "sub11"
 ```
 
-Without `--mu`, `blend.py` searches mu per lead time (slower, same values). The runs `r34-up2` and
-`r34-up3` were built before `--tta` existed and use single predictions.
+Without `--mu`, `blend.py` searches mu per lead time (slower, same values). The runs `r34-up2`,
+`r34-up3` and `r50-up2` were built before `--tta` existed and use single predictions.
 
 ## Results
 
