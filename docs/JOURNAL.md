@@ -74,6 +74,8 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-21 | Google Colab support: `build_colab.py` turns a kernel script into a notebook; training now indexes the arrays instead of copying them (about 3 GB less RAM) so it fits Colab's 12.7 GB | | | first notebook: U-Net++ seed 41 validation run, waiting for the one-time Colab secret |
 | 2026-10-21 | which members matter: U-Net++ validation run alone, decoded (`outputs/single_unetpp_dec.json`) | 0.7646 | | one U-Net++ is almost as good as the four-twin blend (0.7661) |
 | 2026-10-21 | seven validation runs, without up3-loss and effb3-up3 (`outputs/blend7dec.json`) | 0.76697 vs 0.76704 for all nine | | the two runs add nothing: their full-data twins (s136, s123, 2.8 GPU hours) are cancelled, and tonight's ensemble uses seven full-data models |
+| 2026-10-21 | three 9-epoch runs only: r34 long, r50 long, U-Net++ (`outputs/long3dec.json`) | 0.76700 | | as good as seven (0.76697) or nine (0.76704) runs: the 6-epoch runs add nothing once the long runs are in. Better single models, not more members, are the way forward: next runs are 9-epoch U-Net++ variants |
+| 2026-10-21 | eight runs without effb3-up3 | 0.7668 | | within noise of the others |
 | 2026-10-21 | U-Net++ seed 41 validation run on Colab (T4 GPU) | running | | first Colab run; a second U-Net++ is the most promising new ensemble member |
 
 Superseded by submission 13 (full-data training is worth about +0.006 once decoded). Original note: from now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
