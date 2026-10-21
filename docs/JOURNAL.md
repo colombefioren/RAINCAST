@@ -62,6 +62,7 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-21 | resnet50, 3x, 9 epochs, TTA (`indabax-unet-r50-up3-long`) | 0.7020 single, 0.7096 last-7 average | | as good as the resnet34 long run |
 | 2026-10-21 | eight 3x/4x validation runs (up3 s32, up3 s35, up4, up3-loss, r50-up3, effb3-up3, r34 long, r50 long), decoded with fixed mu (`outputs/blend21dec.json`) | 0.7665 | | best validation; its full-data twins are being trained for the final ensemble |
 | 2026-10-21 | full-data twins queued: r34 long s138, effb3 s123, up3-loss s136, up3 s132, up4 s134, r50 long s153 (pushed by a queue script as GPU slots free) | running | | final ensemble = mean of full-data test probabilities, decoded with the calibration of the matching validation blend |
+| 2026-10-21 | full-data r50 3x (s152, last 4) + full-data r34 3x long (s138, last 8), decoded with the calibration of their validation twins (`outputs/twins2dec.json`, twins 0.7650) | twins 0.7650 | 0.78067 (new best) | submission 14: two full-data models beat one (0.77881) |
 | 2026-10-21 | U-Net++ decoder, resnet34, 3x, 9 epochs, batch 16 (`indabax-unetpp-r34-up3-long`) | running | | decoder-architecture diversity |
 
 From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
@@ -77,4 +78,4 @@ Reading of submissions 4 and 5 (corrected): the full-data shift model (0.70337) 
 | Date | Count |
 | --- | --- |
 | 2026-10-20 | 5 |
-| 2026-10-21 | 3 |
+| 2026-10-21 | 4 |
