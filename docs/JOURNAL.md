@@ -57,7 +57,9 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-21 | resnet34 3x for 9 epochs, TTA (`indabax-unet-r34-up3-long`) | 0.7001 single, 0.7097 last-8 average | | best single model: longer training plus a longer epoch average helps by about +0.0015; resnet50 version launched (`indabax-unet-r50-up3-long`) |
 | 2026-10-21 | nine-model blend (adds r34-up3-long), decoded with fixed mu | 0.7658 | | |
 | 2026-10-21 | seven models without the two 2x runs, decoded with fixed mu (`outputs/blend20dec.json`) | 0.7661 | not submitted | best validation so far, but within noise of the submitted 0.7655; not worth a submission |
-| 2026-10-21 | resnet50 3x on all seasons, TTA (`indabax-unet-r50-up3-full-s152`) | running | | to test full-data models inside the decoded ensemble, borrowing calibration from the validation twin |
+| 2026-10-21 | control: resnet50 3x validation run alone, last-4 average, decoded with its own calibration (`outputs/single_r50up3_dec.json`) | 0.7618 | 0.77257 | submission 12; paired with the next row |
+| 2026-10-21 | same recipe trained on all seasons (`indabax-unet-r50-up3-full-s152`), last-4 average, decoded with the control's calibration and mu | no validation possible | 0.77881 (new best) | submission 13: full-data training is worth about +0.006 once decoded, more than the +0.002 seen with thresholds. Plan: retrain the best recipes on all seasons and decode them with calibration from their validation twins |
+| 2026-10-21 | U-Net++ decoder, resnet34, 3x, 9 epochs, batch 16 (`indabax-unetpp-r34-up3-long`) and resnet50 3x 9 epochs (`indabax-unet-r50-up3-long`) | running | | decoder-architecture diversity; longer training |
 
 From now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
@@ -72,4 +74,4 @@ Reading of submissions 4 and 5 (corrected): the full-data shift model (0.70337) 
 | Date | Count |
 | --- | --- |
 | 2026-10-20 | 5 |
-| 2026-10-21 | 1 |
+| 2026-10-21 | 3 |

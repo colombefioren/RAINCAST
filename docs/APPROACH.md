@@ -57,8 +57,10 @@ growth/decay of rain cells.
   probabilities.
 - For the final submissions the same recipe is retrained on all seasons including December 2023, the
   closest data to the test period, with the thresholds from the matching validation run. Several
-  seeds and recipes are averaged before thresholding. Training on all seasons turned out to be worth only
-  about +0.002 on the public leaderboard (submissions 4 and 5).
+  seeds and recipes are averaged before thresholding. With thresholds, training on all seasons was worth only
+  about +0.002 on the public leaderboard (submissions 4 and 5). With the decoder it is worth about
+  +0.006 (submissions 12 and 13, same model and calibration, only the training seasons differ). The
+  full-data models are decoded with the calibration table and mu fitted on their validation twins.
 
 ## From probabilities to a rain mask
 
