@@ -145,7 +145,7 @@ turns one whole training step into a single program and runs it (`xm.mark_step()
 step). The first step is slow because it compiles; the next ones reuse the program as long as every
 tensor keeps the same shape, which is why the last, smaller batch of each epoch is dropped. Reading a
 value back on the host (`loss.item()`) forces the TPU to finish first, so the training loop sums the
-loss on the device and reads it once per epoch. `build_kernel_tpu.py` keeps the eight chips busy with
+loss on the device and reads it once per epoch. `build_kernel_queue.py` keeps the eight chips busy with
 a list of runs, one run per chip at a time. TPU machines are scarce: a TPU session waits in a queue
 before it starts (11 to 24 hours in reports from October 2026), and only one session per user may run
 or wait. So one long session that trains many models is worth more than several short ones. Eight

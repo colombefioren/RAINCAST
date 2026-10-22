@@ -20,7 +20,7 @@ How the session runs:
   trains within 45 minutes, the remaining runs go one after another on the default device.
 - tpu_session.json in the output records every run: chip, start, duration, exit code and files kept.
 
-Usage: python build_kernel_tpu.py <kernel-slug> <runs-file> [budget-hours, default 7.75]
+Usage: python build_kernel_queue.py <kernel-slug> <runs-file> [budget-hours, default 7.75]
 The runs file holds a "base:" line with the train_unet.py arguments every run shares, then one run per line
 (its own arguments, in priority order); # starts a comment. Push with -t 32400, Kaggle's 9-hour TPU limit.
 """
