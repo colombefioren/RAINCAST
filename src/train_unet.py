@@ -59,12 +59,18 @@ def save_weights(path):
     else: torch.save(model.state_dict(), path)
 
 import os, glob
-if not os.path.exists(f"{a.data}/train.npz"):  # Kaggle sometimes mounts competition data under another path
+if not any(os.path.exists(f"{a.data}/{f}") for f in ["train.npz", "train_X.npy"]):  # Kaggle sometimes mounts competition data under another path
     found = glob.glob("/kaggle/input/**/train.npz", recursive=True)
     print("data not at", a.data, "found", found, flush=True)
     if found: a.data = os.path.dirname(found[0])
-tr = np.load(f"{a.data}/train.npz"); te = np.load(f"{a.data}/test.npz")
-X, y, times = tr["X"], tr["y"], tr["times"]; Xt, tt = te["X"], te["times"]
+if os.path.exists(f"{a.data}/train_X.npy"):
+    # arrays unpacked from the .npz files (the TPU launcher does this): memory-mapped, so the runs that share a
+    # machine also share one copy of the 4.3 GB of training data in RAM
+    X, y = (np.load(f"{a.data}/train_{k}.npy", mmap_mode="r") for k in "Xy")
+    times, Xt, tt = (np.load(f"{a.data}/{f}.npy") for f in ["train_times", "test_X", "test_times"])
+else:
+    tr = np.load(f"{a.data}/train.npz"); te = np.load(f"{a.data}/test.npz")
+    X, y, times = tr["X"], tr["y"], tr["times"]; Xt, tt = te["X"], te["times"]
 if a.limit: X, y, times = X[:a.limit], y[:a.limit], times[:a.limit]
 ts = pd.to_datetime(times); tst = pd.to_datetime(tt)
 val = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")) if not a.full else np.zeros(len(ts), bool)
