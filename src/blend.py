@@ -3,7 +3,7 @@ Usage: python src/blend.py --data data --out outputs/blend.json [--dilate 0] pro
 Each *_valprob.npy must have a sibling *_testprob.npy; the blended test prediction is written next to --out."""
 import argparse, json, numpy as np, pandas as pd
 from scipy.ndimage import uniform_filter
-from fss import fss_pooled, report
+from fss import fss_pooled, report, load_prob
 
 p = argparse.ArgumentParser()
 p.add_argument("--data", required=True); p.add_argument("--out", required=True)
@@ -26,9 +26,9 @@ else:
 w = np.array([float(x) for x in a.weights.split(",")]) if a.weights else np.ones(len(a.probs))
 w = w / w.sum()
 for f in a.probs:
-    pv = np.load(f).astype(np.float32); report(f.split("/")[-1][:28], (pv > 0.5) * 10.0, yv)
-PV = sum(wi * np.load(f).astype(np.float32) for wi, f in zip(w, a.probs))
-PT = sum(wi * np.load(f.replace("_valprob", "_testprob")).astype(np.float32) for wi, f in zip(w, a.probs))
+    pv = load_prob(f); report(f.split("/")[-1][:28], (pv > 0.5) * 10.0, yv)
+PV = sum(wi * load_prob(f) for wi, f in zip(w, a.probs))
+PT = sum(wi * load_prob(f.replace("_valprob", "_testprob")) for wi, f in zip(w, a.probs))
 if a.smooth > 1:
     PV = uniform_filter(PV, size=(1, 1, a.smooth, a.smooth), mode="nearest")
     PT = uniform_filter(PT, size=(1, 1, a.smooth, a.smooth), mode="nearest")

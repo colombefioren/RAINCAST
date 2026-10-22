@@ -8,6 +8,13 @@ THR = 1.0
 WIN = 3
 
 
+def load_prob(path):
+    """A saved probability map as float32: stored as float16 / float32, or as uint8 holding probability x 255
+    (src/fetch_tpu_runs.py stores validation blends that way to save disk)."""
+    a = np.load(path)
+    return a.astype(np.float32) / 255 if a.dtype == np.uint8 else a.astype(np.float32)
+
+
 def fractions(binary, win=WIN):
     # binary: (N, H, W) -> neighbourhood fraction of rainy pixels, zero padded at edges
     return uniform_filter(binary.astype(np.float32), size=(1, win, win), mode="constant", cval=0.0)
