@@ -24,6 +24,8 @@ p.add_argument("--pos_w", type=float, default=8.0, help="BCE positive class weig
 p.add_argument("--mixup", type=float, default=0.0, help="prob of temporal mixup with the next hourly sample")
 p.add_argument("--wet_sampling", type=int, default=0, help="1: sample training rows with prob proportional to q_min + rain fraction")
 p.add_argument("--full", action="store_true", help="train on all data (no validation), for final submission")
+p.add_argument("--init", default="", help="start from these saved weights (a .pt of a run with the same model) instead of "
+               "random ones: fine-tunes a finished run, e.g. on all seasons with --full")
 p.add_argument("--seed", type=int, default=42)
 p.add_argument("--limit", type=int, default=0, help="debug: use only first N train samples")
 p.add_argument("--threads", type=int, default=12)
@@ -165,6 +167,7 @@ if a.upscale > 1:
             y = self.m(F.interpolate(x, scale_factor=self.f, mode="bilinear", align_corners=False))
             return F.avg_pool2d(y, self.f)
     model = Upscaled(model, a.upscale).to(dev)
+if a.init: model.load_state_dict(torch.load(a.init, map_location="cpu"))
 opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
 steps = a.epochs * len(dl_tr)
 sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=steps, pct_start=0.15)
