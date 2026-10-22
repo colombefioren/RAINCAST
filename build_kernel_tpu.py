@@ -56,9 +56,12 @@ for d in (OUT, DATA): os.makedirs(d, exist_ok=True)
 def log(*msg):  # one write per line, so lines from different threads do not mix
     print(f"[{(time.time() - T0) / 60:5.1f} min] " + " ".join(map(str, msg)) + "\n", end="", flush=True)
 
-for c in ["nproc", "free -g | head -2", "df -h /kaggle/tmp /kaggle/working | tail -2", "python --version",
-          "pip list 2>/dev/null | grep -i -E '^(torch|torchvision|torch-xla|torch_xla|libtpu|libtpu-nightly|numpy) '"]:
-    subprocess.run(c, shell=True)  # what the machine offers, for the log
+# what the machine offers, for the log (commands run without a shell)
+for cmd in (["nproc"], ["free", "-g"], ["df", "-h", "/kaggle/tmp", "/kaggle/working"], [sys.executable, "--version"]):
+    try: subprocess.run(cmd)
+    except OSError as e: print(cmd[0], "unavailable:", e, flush=True)
+installed = subprocess.run([sys.executable, "-m", "pip", "list"], capture_output=True, text=True).stdout.splitlines()
+print("\n".join(l for l in installed if re.match(r"(torch|torchvision|torch[-_]xla|libtpu(-nightly)?|numpy) ", l, re.I)), flush=True)
 
 # segmentation-models-pytorch must not replace the torch build that torch_xla was compiled against, so the
 # installed versions of the TPU stack are pip constraints
