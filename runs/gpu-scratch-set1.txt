@@ -1,0 +1,14 @@
+# Training runs for the first Kaggle GPU session after the weekly GPU quota refreshes (Saturday 24 October,
+# 00:00 UTC), built with build_kernel_queue.py --gpu: two T4 GPUs, one run each, in priority order.
+# The main from-scratch recipe (U-Net++ resnet34, 3x input upscale) trained 24 epochs: the 8-epoch run s60
+# was still improving at its last epoch. Each validation run has a full-data twin, so every round adds one
+# member to the final ensemble and one to the validation blend that calibrates its decoder.
+# Expected on T4: about 2.5 hours per validation run and 2.7 hours per full-data run, 8.2 hours in all.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 91
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 191 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 92
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 192 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 93
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 193 --full

@@ -141,8 +141,8 @@ quota counts session hours, so two runs side by side cost the hours of one, and 
 be downloaded when the whole session ends: shorter budgets give results sooner.
 
 ```bash
-python build_kernel_queue.py indabax-gpu-scratch-sat1 runs/gpu-scratch-sat1.txt --gpu
-kaggle kernels push -p kernel/indabax-gpu-scratch-sat1 -t 43200
+python build_kernel_queue.py indabax-gpu-scratch-set1 runs/gpu-scratch-set1.txt --gpu
+kaggle kernels push -p kernel/indabax-gpu-scratch-set1 -t 43200
 ```
 
 At most two GPU sessions run at a time, so two such kernels keep four GPUs busy.

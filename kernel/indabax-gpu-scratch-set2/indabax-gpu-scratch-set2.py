@@ -1,0 +1,178 @@
+import glob, json, os, re, shutil, subprocess, sys, threading, time
+from importlib import metadata
+T0 = time.time()
+BUDGET, HARD = 38700, 40200  # seconds from now: runs must be expected to end before BUDGET; at HARD every run stops
+GPU = True  # True: one run per GPU; False: one run per TPU chip
+RUNS = [['--data', '/kaggle/input/competitions/hackathon-IndabaX-MDG-2026', '--out', '/kaggle/tmp/out', '--threads', '4', '--save_each', '--keep_epochs', '6', '--tta', '0', '--lr', '1e-3', '--aug', '2', '--dropout', '0.2', '--bs', '16', '--upscale', '3', '--amp', '1', '--eval_bs', '32', '--arch', 'UnetPlusPlus', '--encoder', 'resnet34', '--epochs', '36', '--seed', '94'], ['--data', '/kaggle/input/competitions/hackathon-IndabaX-MDG-2026', '--out', '/kaggle/tmp/out', '--threads', '4', '--save_each', '--keep_epochs', '6', '--tta', '0', '--lr', '1e-3', '--aug', '2', '--dropout', '0.2', '--bs', '16', '--upscale', '3', '--amp', '1', '--eval_bs', '32', '--arch', 'UnetPlusPlus', '--encoder', 'resnet34', '--epochs', '36', '--seed', '194', '--full'], ['--data', '/kaggle/input/competitions/hackathon-IndabaX-MDG-2026', '--out', '/kaggle/tmp/out', '--threads', '4', '--save_each', '--keep_epochs', '6', '--tta', '0', '--lr', '1e-3', '--aug', '2', '--dropout', '0.2', '--bs', '16', '--upscale', '3', '--amp', '1', '--eval_bs', '32', '--arch', 'Unet', '--encoder', 'resnet34', '--epochs', '32', '--seed', '95'], ['--data', '/kaggle/input/competitions/hackathon-IndabaX-MDG-2026', '--out', '/kaggle/tmp/out', '--threads', '4', '--save_each', '--keep_epochs', '6', '--tta', '0', '--lr', '1e-3', '--aug', '2', '--dropout', '0.2', '--bs', '16', '--upscale', '3', '--amp', '1', '--eval_bs', '32', '--arch', 'Unet', '--encoder', 'resnet34', '--epochs', '32', '--seed', '195', '--full'], ['--data', '/kaggle/input/competitions/hackathon-IndabaX-MDG-2026', '--out', '/kaggle/tmp/out', '--threads', '4', '--save_each', '--keep_epochs', '6', '--tta', '0', '--lr', '1e-3', '--aug', '2', '--dropout', '0.2', '--bs', '16', '--upscale', '3', '--amp', '1', '--eval_bs', '32', '--arch', 'UnetPlusPlus', '--encoder', 'resnet34', '--epochs', '24', '--seed', '96'], ['--data', '/kaggle/input/competitions/hackathon-IndabaX-MDG-2026', '--out', '/kaggle/tmp/out', '--threads', '4', '--save_each', '--keep_epochs', '6', '--tta', '0', '--lr', '1e-3', '--aug', '2', '--dropout', '0.2', '--bs', '16', '--upscale', '3', '--amp', '1', '--eval_bs', '32', '--arch', 'UnetPlusPlus', '--encoder', 'resnet34', '--epochs', '24', '--seed', '196', '--full']]
+OUT, DATA, WORK = "/kaggle/tmp/out", "/kaggle/tmp/data", "/kaggle/working"
+for d in (OUT, DATA): os.makedirs(d, exist_ok=True)
+def log(*msg):  # one write per line, so lines from different threads do not mix
+    print(f"[{(time.time() - T0) / 60:5.1f} min] " + " ".join(map(str, msg)) + "\n", end="", flush=True)
+
+# what the machine offers, for the log (commands run without a shell)
+for cmd in [["nproc"], ["free", "-g"], ["df", "-h", "/kaggle/tmp", "/kaggle/working"], [sys.executable, "--version"]] + [["nvidia-smi", "-L"]] * GPU:
+    try: subprocess.run(cmd)
+    except OSError as e: print(cmd[0], "unavailable:", e, flush=True)
+installed = subprocess.run([sys.executable, "-m", "pip", "list"], capture_output=True, text=True).stdout.splitlines()
+print("\n".join(l for l in installed if re.match(r"(torch|torchvision|torch[-_]xla|libtpu(-nightly)?|numpy) ", l, re.I)), flush=True)
+
+# segmentation-models-pytorch must not replace the torch build that torch_xla (or CUDA) was compiled against,
+# so the installed versions of the torch stack are pip constraints
+pins = []
+for name in ["torch", "torchvision", "torchaudio", "torch_xla", "libtpu", "libtpu-nightly", "numpy"]:
+    try: pins.append(f"{name}=={metadata.version(name)}")
+    except metadata.PackageNotFoundError: pass
+open("/kaggle/tmp/pins.txt", "w").write("\n".join(pins) + "\n")
+log("pip constraints:", pins)
+imports = lambda: subprocess.run([sys.executable, "-c", "import segmentation_models_pytorch" + ("" if GPU else ", torch_xla")]).returncode == 0
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-c", "/kaggle/tmp/pins.txt", "segmentation-models-pytorch"])
+if not imports():  # the pinned install could not resolve: install the package code alone
+    subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--no-deps", "segmentation-models-pytorch", "timm"])
+if not imports(): sys.exit("segmentation_models_pytorch (or torch_xla) does not import, see the errors above")
+if GPU:
+    DEVICES = list(range(sum(l.startswith("GPU ") for l in subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True).stdout.splitlines())))
+    if not DEVICES: sys.exit("no GPU visible to nvidia-smi")
+else:
+    DEVICES = list(range(8))
+open("/kaggle/tmp/train.py", "w").write('import sys; KERNEL_ARGS = sys.argv[1:]\nimport numpy as np\nfrom scipy.ndimage import uniform_filter\n\nTHR = 1.0\nWIN = 3\n\n\ndef load_prob(path):\n    """A saved probability map as float32: stored as float16 / float32, or as uint8 holding probability x 255\n    (src/fetch_runs.py stores validation blends that way to save disk)."""\n    a = np.load(path)\n    return a.astype(np.float32) / 255 if a.dtype == np.uint8 else a.astype(np.float32)\n\n\ndef fractions(binary, win=WIN):\n    # binary: (N, H, W) -> neighbourhood fraction of rainy pixels, zero padded at edges\n    return uniform_filter(binary.astype(np.float32), size=(1, win, win), mode="constant", cval=0.0)\n\n\ndef fss_components(pred, obs, thr=THR, win=WIN):\n    pf = fractions(pred > thr, win)\n    po = fractions(obs > thr, win)\n    num = ((pf - po) ** 2).sum(axis=(1, 2))\n    den = (pf ** 2).sum(axis=(1, 2)) + (po ** 2).sum(axis=(1, 2))\n    return num, den  # per sample\n\n\ndef fss_pooled(pred, obs, thr=THR, win=WIN):\n    """pred, obs: (N, 3, H, W). FSS per lead time pooled over samples, then mean of 3."""\n    scores = []\n    for k in range(obs.shape[1]):\n        num, den = fss_components(pred[:, k], obs[:, k], thr, win)\n        scores.append(1.0 - num.sum() / max(den.sum(), 1e-12))\n    return float(np.mean(scores)), scores\n\n\ndef fss_per_sample(pred, obs, thr=THR, win=WIN, empty=1.0):\n    """Mean over samples of per-sample FSS; samples with no rain in either field score `empty`."""\n    scores = []\n    for k in range(obs.shape[1]):\n        num, den = fss_components(pred[:, k], obs[:, k], thr, win)\n        s = np.where(den > 0, 1.0 - num / np.maximum(den, 1e-12), empty)\n        scores.append(float(s.mean()))\n    return float(np.mean(scores)), scores\n\n\ndef report(name, pred, obs):\n    p, pk = fss_pooled(pred, obs)\n    s, sk = fss_per_sample(pred, obs)\n    print(f"{name:28s} pooled={p:.4f} [{pk[0]:.3f} {pk[1]:.3f} {pk[2]:.3f}]  "\n          f"per-sample={s:.4f} [{sk[0]:.3f} {sk[1]:.3f} {sk[2]:.3f}]", flush=True)\n    return p\n\nimport sys, numpy as np, cv2\nfrom scipy.ndimage import map_coordinates\n\n\ndef flow_between(a, b):\n    a8 = np.clip(np.log1p(np.maximum(a, 0)) * 40, 0, 255).astype(np.uint8)\n    b8 = np.clip(np.log1p(np.maximum(b, 0)) * 40, 0, 255).astype(np.uint8)\n    return cv2.calcOpticalFlowFarneback(a8, b8, None, 0.5, 3, 9, 3, 5, 1.1, 0)  # (H,W,2) dx,dy\n\n\ndef advect(field, flow, steps):\n    H, W = field.shape\n    yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)\n    out = []\n    for s in range(1, steps + 1):\n        # semi-Lagrangian backward: value at x comes from x - s*flow\n        src_x = xx - s * flow[..., 0]; src_y = yy - s * flow[..., 1]\n        out.append(map_coordinates(field, [src_y, src_x], order=1, mode="constant", cval=0.0))\n    return np.stack(out)\n\n\ndef advect_batch(X, steps=3):\n    """X: (N,3,H,W) -> (N,steps,H,W) advected forecasts of the last frame."""\n    out = np.zeros((X.shape[0], steps) + X.shape[2:], np.float32)\n    for i in range(X.shape[0]):\n        fl = flow_between(X[i, 1], X[i, 2])\n        out[i] = advect(X[i, 2], fl, steps)\n    return out\n\n\n\nimport argparse, time, json, numpy as np, pandas as pd, torch, torch.nn as nn, torch.nn.functional as F\nimport segmentation_models_pytorch as smp\n\np = argparse.ArgumentParser()\np.add_argument("--data", required=True)\np.add_argument("--out", default="outputs")\np.add_argument("--encoder", default="resnet18")\np.add_argument("--arch", default="Unet", choices=["Unet", "UnetPlusPlus", "FPN", "DeepLabV3Plus"], help="segmentation-models-pytorch decoder")\np.add_argument("--attention", default="", choices=["", "scse"], help="scse: squeeze-and-excitation attention blocks in the Unet / UnetPlusPlus decoder")\np.add_argument("--pretrained", type=int, default=0, help="1: start the encoder from ImageNet weights. The rules forbid weights pretrained "\n               "outside the competition data since they changed after 20 October, so this only reproduces earlier runs")\np.add_argument("--epochs", type=int, default=8)\np.add_argument("--bs", type=int, default=32)\np.add_argument("--lr", type=float, default=1e-3)\np.add_argument("--fss_w", type=float, default=1.0)\np.add_argument("--csi_w", type=float, default=0.0, help="weight of batch-pooled soft CSI (IoU) loss")\np.add_argument("--ms_fss", type=int, default=0, help="1: add 5x5 and 9x9 soft FSS terms (weighted more for later leads)")\np.add_argument("--pos_w", type=float, default=8.0, help="BCE positive class weight")\np.add_argument("--mixup", type=float, default=0.0, help="prob of temporal mixup with the next hourly sample")\np.add_argument("--wet_sampling", type=int, default=0, help="1: sample training rows with prob proportional to q_min + rain fraction")\np.add_argument("--full", action="store_true", help="train on all data (no validation), for final submission")\np.add_argument("--seed", type=int, default=42)\np.add_argument("--limit", type=int, default=0, help="debug: use only first N train samples")\np.add_argument("--threads", type=int, default=12)\np.add_argument("--aug", type=int, default=0, help="1: flips + 90-degree rotations, 2: random translations")\np.add_argument("--dropout", type=float, default=0.0)\np.add_argument("--stride", type=int, default=1, help="use every k-th hourly train sample")\np.add_argument("--save_each", action="store_true", help="save test/val probs at every epoch")\np.add_argument("--keep_epochs", type=int, default=0, help="with --save_each: keep the probabilities of only the last N "\n               "epochs on disk (0: all), which also caps the last-k epoch blends at N epochs")\np.add_argument("--upscale", type=int, default=1, help="2: upsample inputs 2x before the encoder, downsample logits back")\np.add_argument("--aux_reg", type=float, default=0.0, help="weight of an auxiliary head regressing log1p(rain)/2 at each lead (multi-task)")\np.add_argument("--tta", type=int, default=0, help="1: average predictions over 8-pixel shifted copies (up, down, left, right)")\np.add_argument("--eval_bs", type=int, default=64, help="batch size for validation and test predictions (lower it if they run out of GPU memory)")\np.add_argument("--amp", type=int, default=0, help="1: mixed precision (float16 forward pass with loss scaling) on GPU, faster and lighter")\np.add_argument("--advect", type=int, default=0, help="1: add optical-flow advected maps (+1h,+2h,+3h) as input channels")\np.add_argument("--xla", type=int, default=0, help="1: train on one TPU chip through PyTorch/XLA (Kaggle TPU v5e-8); "\n               "--amp 1 then means bfloat16 autocast, which needs no loss scaling")\na = p.parse_args(KERNEL_ARGS)\ntorch.manual_seed(a.seed); np.random.seed(a.seed); torch.set_num_threads(a.threads)\nif a.xla:\n    import torch_xla.core.xla_model as xm\n    import torch_xla.distributed.parallel_loader as pl\n    dev = xm.xla_device()\nelse:\n    dev = "cuda" if torch.cuda.is_available() else "cpu"\nprint("device", dev, torch.cuda.get_device_name(0) if dev == "cuda" else "", flush=True)\nAMP = bool(a.amp) and dev == "cuda"\nBF16 = bool(a.amp) and bool(a.xla)\ndef autocast():\n    if a.xla: return torch.autocast(device_type="xla", dtype=torch.bfloat16, enabled=BF16)\n    return torch.autocast(device_type="cuda" if AMP else "cpu", dtype=torch.float16, enabled=AMP)\ndef save_weights(path):\n    """XLA tensors must be copied to the CPU before saving; xm.save does that (every process saves its own run)."""\n    if a.xla: xm.save(model.state_dict(), path, master_only=False)\n    else: torch.save(model.state_dict(), path)\n\nimport os, glob\nif not any(os.path.exists(f"{a.data}/{f}") for f in ["train.npz", "train_X.npy"]):  # Kaggle sometimes mounts competition data under another path\n    found = glob.glob("/kaggle/input/**/train.npz", recursive=True)\n    print("data not at", a.data, "found", found, flush=True)\n    if found: a.data = os.path.dirname(found[0])\nif os.path.exists(f"{a.data}/train_X.npy"):\n    # arrays unpacked from the .npz files (the TPU launcher does this): memory-mapped, so the runs that share a\n    # machine also share one copy of the 4.3 GB of training data in RAM\n    X, y = (np.load(f"{a.data}/train_{k}.npy", mmap_mode="r") for k in "Xy")\n    times, Xt, tt = (np.load(f"{a.data}/{f}.npy") for f in ["train_times", "test_X", "test_times"])\nelse:\n    tr = np.load(f"{a.data}/train.npz"); te = np.load(f"{a.data}/test.npz")\n    X, y, times = tr["X"], tr["y"], tr["times"]; Xt, tt = te["X"], te["times"]\nif a.limit: X, y, times = X[:a.limit], y[:a.limit], times[:a.limit]\nts = pd.to_datetime(times); tst = pd.to_datetime(tt)\nval = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")) if not a.full else np.zeros(len(ts), bool)\n\nADV, ADVt = (advect_batch(X), advect_batch(Xt)) if a.advect else (None, None)\nif a.advect: print("advected inputs ready", ADV.shape, flush=True)\nN_IN = 8 + (3 if a.advect else 0)\nN_OUT = 6 if a.aux_reg > 0 else 3\n# fixed coordinate channels (CoordConv): standardised row and column index, the same for every sample, so the\n# network can learn location-dependent behaviour while each forecast reads only its three rain maps and its\n# timestamp. They equal the standardised latitude and longitude grids of the data files to within 1e-6.\nramp = (np.arange(X.shape[-1]) - (X.shape[-1] - 1) / 2) / np.arange(X.shape[-1]).std()\nrow_c = np.repeat(ramp[:, None], X.shape[-1], 1).astype(np.float32)\ncol_c = np.repeat(ramp[None, :], X.shape[-1], 0).astype(np.float32)\n\ndef time_feats(t):\n    h = t.hour.values + t.minute.values / 60.0\n    doy = t.dayofyear.values.astype(np.float32)\n    sd = np.where(doy > 300, doy - 335, doy + 30) / 120.0  # Dec 1 -> 0 ... Mar 31 -> ~1\n    return np.stack([np.sin(2 * np.pi * h / 24), np.cos(2 * np.pi * h / 24), sd], 1).astype(np.float32)\n\nclass Rows:\n    """Read-only view of arr[idx] that avoids copying (saves about 3 GB of RAM, needed on Colab)."""\n    def __init__(self, arr, idx): self.arr, self.idx = arr, idx\n    def __len__(self): return len(self.idx)\n    def __getitem__(self, i): return self.arr[self.idx[i]]\n\nclass DS(torch.utils.data.Dataset):\n    def __init__(self, X, y, tf, aug=0, adv=None, mixup=0.0): self.X, self.y, self.tf, self.aug, self.adv, self.mixup = X, y, tf, aug, adv, mixup\n    def __len__(self): return len(self.X)\n    def target(self, i):\n        """3 binary rain maps (> 1 mm/h); with --aux_reg also 3 maps of log1p(rain)/2."""\n        b = (self.y[i] > 1.0).astype(np.float32)\n        if a.aux_reg > 0: b = np.concatenate([b, (np.log1p(np.maximum(self.y[i], 0)) / 2.0).astype(np.float32)], 0)\n        return b\n    def __getitem__(self, i):\n        x = np.log1p(np.maximum(self.X[i], 0)) / 2.0  # (3,H,W)\n        H, W = x.shape[1:]\n        tfe = np.broadcast_to(self.tf[i][:, None, None], (3, H, W))\n        parts = [x, row_c[None], col_c[None], tfe]\n        if self.adv is not None: parts.append(np.log1p(np.maximum(self.adv[i], 0)) / 2.0)\n        inp = np.concatenate(parts, 0).astype(np.float32)\n        tgt = self.target(i) if self.y is not None else np.zeros((N_OUT, H, W), np.float32)\n        if self.mixup > 0 and self.y is not None and i + 1 < len(self.X) and np.random.rand() < self.mixup:\n            lam = np.random.rand()\n            x2 = np.log1p(np.maximum(self.X[i + 1], 0)) / 2.0\n            parts2 = [x2, row_c[None], col_c[None], np.broadcast_to(self.tf[i + 1][:, None, None], (3, H, W))]\n            if self.adv is not None: parts2.append(np.log1p(np.maximum(self.adv[i + 1], 0)) / 2.0)\n            inp = lam * inp + (1 - lam) * np.concatenate(parts2, 0).astype(np.float32)\n            tgt = lam * tgt + (1 - lam) * self.target(i + 1)\n        if self.aug == 1:  # rotations and flips: break the geographic motion prior, kept for reference\n            k = np.random.randint(4)\n            inp, tgt = np.rot90(inp, k, axes=(1, 2)), np.rot90(tgt, k, axes=(1, 2))\n            if np.random.rand() < 0.5: inp, tgt = inp[:, :, ::-1], tgt[:, :, ::-1]\n            inp, tgt = np.ascontiguousarray(inp), np.ascontiguousarray(tgt)\n        elif self.aug == 2:  # random translation up to 16 px with zero fill: keeps motion direction\n            dy, dx = np.random.randint(-16, 17, size=2)\n            def shift(arr):\n                out = np.zeros_like(arr)\n                ys, yd = (slice(0, H - dy), slice(dy, H)) if dy >= 0 else (slice(-dy, H), slice(0, H + dy))\n                xs, xd = (slice(0, W - dx), slice(dx, W)) if dx >= 0 else (slice(-dx, W), slice(0, W + dx))\n                out[:, yd, xd] = arr[:, ys, xs]\n                return out\n            inp, tgt = shift(inp), shift(tgt)\n        return torch.from_numpy(inp), torch.from_numpy(tgt)\n\ntf_tr, tf_te = time_feats(ts), time_feats(tst)\ntr_idx = np.where(~val)[0][::a.stride]\nsub = lambda arr, idx: None if arr is None else arr[idx]\nds_tr = DS(Rows(X, tr_idx), Rows(y, tr_idx), tf_tr[tr_idx], a.aug, sub(ADV, tr_idx), a.mixup)\nif a.wet_sampling:\n    wet = np.array([(y[j] > 1.0).mean() for j in tr_idx])\n    wts = torch.tensor(0.02 + wet / max(wet.mean(), 1e-6), dtype=torch.double)\n    sampler = torch.utils.data.WeightedRandomSampler(wts, num_samples=len(tr_idx), replacement=True)\n    dl_tr = torch.utils.data.DataLoader(ds_tr, batch_size=a.bs, sampler=sampler, num_workers=2, drop_last=True)\nelse:\n    dl_tr = torch.utils.data.DataLoader(ds_tr, batch_size=a.bs, shuffle=True, num_workers=2, drop_last=True)\nva_idx = np.where(val)[0]\ndl_va = torch.utils.data.DataLoader(DS(Rows(X, va_idx), Rows(y, va_idx), tf_tr[val], 0, sub(ADV, val)), batch_size=a.eval_bs, num_workers=2) if val.any() else None\ndl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt), batch_size=a.eval_bs, num_workers=2)\n\nextra = {"decoder_attention_type": a.attention} if a.attention else {}\nmodel = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet" if a.pretrained else None, in_channels=N_IN, classes=N_OUT, **extra).to(dev)\nif a.dropout > 0:\n    model.segmentation_head = nn.Sequential(nn.Dropout2d(a.dropout), model.segmentation_head)\nif a.upscale > 1:\n    class Upscaled(nn.Module):\n        def __init__(self, m, f): super().__init__(); self.m, self.f = m, f\n        def forward(self, x):\n            y = self.m(F.interpolate(x, scale_factor=self.f, mode="bilinear", align_corners=False))\n            return F.avg_pool2d(y, self.f)\n    model = Upscaled(model, a.upscale).to(dev)\nopt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)\nsteps = a.epochs * len(dl_tr)\nsched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=steps, pct_start=0.15)\npos_w = torch.tensor([a.pos_w], device=dev)\nscaler = torch.cuda.amp.GradScaler(enabled=AMP)  # rescales the loss so float16 gradients do not underflow\n\nLEAD_W = torch.tensor([1.0, 1.0, 1.0], device=dev)\ndef soft_fss_loss(logits, tgt, k=3, lead_w=LEAD_W):\n    # batch-pooled, like the competition metric (pooled over all test samples)\n    pr = torch.sigmoid(logits)\n    pf = F.avg_pool2d(pr, k, stride=1, padding=k // 2)\n    po = F.avg_pool2d(tgt, k, stride=1, padding=k // 2)\n    num = ((pf - po) ** 2).sum(dim=(0, 2, 3))\n    den = (pf ** 2).sum(dim=(0, 2, 3)) + (po ** 2).sum(dim=(0, 2, 3)) + 1e-6\n    return ((num / den) * lead_w).sum() / lead_w.sum()\ndef soft_csi_loss(logits, tgt):\n    pr = torch.sigmoid(logits)\n    inter = (pr * tgt).sum(dim=(0, 2, 3)); union = pr.sum(dim=(0, 2, 3)) + tgt.sum(dim=(0, 2, 3)) - inter\n    return (1 - inter / (union + 1e-6)).mean()\ndef total_loss(logits, yb):\n    if a.aux_reg > 0:\n        reg = F.mse_loss(logits[:, 3:], yb[:, 3:]); logits, yb = logits[:, :3], yb[:, :3]\n    else:\n        reg = 0.0\n    l = F.binary_cross_entropy_with_logits(logits, yb, pos_weight=pos_w) + a.fss_w * soft_fss_loss(logits, yb)\n    if a.ms_fss:\n        l = l + 0.5 * soft_fss_loss(logits, yb, 5, torch.tensor([0.5, 1.0, 1.5], device=dev)) + 0.5 * soft_fss_loss(logits, yb, 9, torch.tensor([0.25, 0.75, 2.0], device=dev))\n    if a.csi_w > 0: l = l + a.csi_w * soft_csi_loss(logits, yb)\n    return l + a.aux_reg * reg\n\ndef tshift(t, dy, dx):\n    """Shift (N,C,H,W) by dy, dx with zero fill, like the training translation augmentation."""\n    out = torch.zeros_like(t); H, W = t.shape[2:]\n    ys, yd = (slice(0, H - dy), slice(dy, H)) if dy >= 0 else (slice(-dy, H), slice(0, H + dy))\n    xs, xd = (slice(0, W - dx), slice(dx, W)) if dx >= 0 else (slice(-dx, W), slice(0, W + dx))\n    out[:, :, yd, xd] = t[:, :, ys, xs]\n    return out\nVIEWS = [(0, 0), (8, 0), (-8, 0), (0, 8), (0, -8)] if a.tta else [(0, 0)]\ndef predict(dl):\n    """Probabilities; with --tta, the average over shifted copies, each shifted back (pixels a view lost are skipped)."""\n    model.eval(); out = []\n    with torch.no_grad():\n        for xb, _ in dl:\n            xb = xb.to(dev); acc = 0; cnt = 0\n            for dy, dx in VIEWS:\n                with autocast(): logits = model(tshift(xb, dy, dx))\n                acc = acc + tshift(torch.sigmoid(logits[:, :3].float()), -dy, -dx)\n                cnt = cnt + tshift(tshift(torch.ones_like(xb[:, :1]), dy, dx), -dy, -dx)\n            out.append((acc / cnt.clamp(min=1)).cpu().numpy())\n    return np.concatenate(out)\n\ndef tune_thresholds(prob, obs):\n    best = []\n    for k in range(3):\n        cands = np.arange(0.15, 0.71, 0.025)\n        sc = [fss_pooled((prob[:, k:k+1] > t) * 10.0, obs[:, k:k+1])[0] for t in cands]\n        best.append(float(cands[int(np.argmax(sc))]))\n        print(f"  lead {k+1}: best thr {best[-1]:.3f} fss {max(sc):.4f}", flush=True)\n    return best\n\nimport os; os.makedirs(a.out, exist_ok=True)\ntag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")\ndef masks(prob, thr):\n    """Rain maps (0 or 10 mm/h) from one threshold per lead, in float32 to keep memory low."""\n    return np.stack([prob[:, j] > thr[j] for j in range(3)], 1).astype(np.float32) * np.float32(10.0)\n\n# per-epoch validation probabilities go to disk (VAL_EPOCHS holds file names): keeping nine of them in\n# RAM, plus the data, does not fit in Colab\'s 12.7 GB\nbest_score, hist, VAL_EPOCHS = -1, [], []\nyv = y[val] if dl_va is not None else None\nfor ep in range(a.epochs):\n    model.train(); t0 = time.time(); tl = 0\n    # on XLA the step is only traced here and runs at xm.mark_step(); reading the loss every step would make\n    # the host wait for the device, so the epoch loss is summed on the device instead\n    for i, (xb, yb) in enumerate(pl.MpDeviceLoader(dl_tr, dev) if a.xla else dl_tr):\n        xb, yb = xb.to(dev), yb.to(dev)\n        with autocast(): logits = model(xb)\n        loss = total_loss(logits.float(), yb)  # loss in float32 even with --amp\n        opt.zero_grad(); scaler.scale(loss).backward(); scaler.step(opt); scaler.update(); sched.step()\n        if a.xla:\n            tl = tl + loss.detach(); xm.mark_step()\n        else:\n            tl += loss.item()\n        if i % 50 == 0: print(f"ep{ep} it{i}/{len(dl_tr)} loss {loss.item():.4f} {time.time()-t0:.0f}s", flush=True)\n    tl = float(tl)\n    msg = f"epoch {ep} train_loss {tl/len(dl_tr):.4f} time {time.time()-t0:.0f}s"\n    if dl_va is not None:\n        pv = predict(dl_va)\n        s05 = fss_pooled(masks(pv, [0.5] * 3), yv)[0]; s03 = fss_pooled(masks(pv, [0.3] * 3), yv)[0]\n        msg += f" val_fss@0.5 {s05:.4f} @0.3 {s03:.4f}"\n        score = max(s05, s03)\n        if score > best_score:\n            best_score = score; save_weights(f"{a.out}/{tag}.pt"); np.save(f"{a.out}/{tag}_valprob.npy", pv.astype(np.float16))\n    else:\n        save_weights(f"{a.out}/{tag}.pt")\n    print(msg, flush=True); hist.append(msg)\n    if a.save_each:\n        np.save(f"{a.out}/{tag}_ep{ep}_testprob.npy", predict(dl_te).astype(np.float16))\n        if dl_va is not None:\n            VAL_EPOCHS.append(f"{a.out}/{tag}_ep{ep}_valprob.npy"); np.save(VAL_EPOCHS[-1], pv.astype(np.float16))\n        if a.keep_epochs and ep >= a.keep_epochs:  # a long run on a small disk keeps only its last epochs\n            old = f"{a.out}/{tag}_ep{ep - a.keep_epochs}"\n            os.remove(f"{old}_testprob.npy")\n            if dl_va is not None: os.remove(f"{old}_valprob.npy"); VAL_EPOCHS.pop(0)\n    if dl_va is not None: del pv\n\nif dl_va is not None:\n    # free the training arrays (about 4 GB) before the epoch blends: Colab has 12.7 GB of RAM\n    del dl_tr, ds_tr, dl_va, X, y; import gc; gc.collect()\n    model.load_state_dict(torch.load(f"{a.out}/{tag}.pt"))\n    pv = np.load(f"{a.out}/{tag}_valprob.npy").astype(np.float32)\n    print("tuning thresholds on validation", flush=True)\n    thr = tune_thresholds(pv, yv)\n    report("unet tuned", masks(pv, thr), yv); del pv\n    epoch_blends = {}\n    if a.save_each and len(VAL_EPOCHS) > 1:\n        # blends of the last k epochs: tells which epochs to average for the test prediction\n        acc = np.load(VAL_EPOCHS[-1]).astype(np.float32)\n        for k in range(2, len(VAL_EPOCHS) + 1):\n            acc += np.load(VAL_EPOCHS[-k])  # running sum of the last k epochs, one epoch in memory at a time\n            pb = acc / k\n            print(f"blend of last {k} epochs", flush=True)\n            tk = tune_thresholds(pb, yv)\n            sc = report(f"  last{k} tuned", masks(pb, tk), yv)\n            epoch_blends[f"last{k}"] = {"thr": tk, "val_fss": sc, "epochs": list(range(a.epochs - k, a.epochs))}\n            np.save(f"{a.out}/{tag}_last{k}_valprob.npy", pb.astype(np.float16))\n    json.dump({"thr": thr, "best_val": best_score, "hist": hist, "epoch_blends": epoch_blends}, open(f"{a.out}/{tag}.json", "w"), indent=1)\n    for f in VAL_EPOCHS: os.remove(f)  # the last-k files now hold the same information\npt = predict(dl_te); np.save(f"{a.out}/{tag}_testprob.npy", pt.astype(np.float16))\nprint("saved test probs", pt.shape, flush=True)\n')
+
+# the competition arrays, unpacked once into .npy files that every run memory-maps: the runs then share one
+# copy of the 4.3 GB of training data in RAM instead of loading one each
+import numpy as np
+found = glob.glob("/kaggle/input/**/train.npz", recursive=True)
+if found:
+    src = os.path.dirname(found[0])
+    for split in ["train", "test"]:
+        z = np.load(f"{src}/{split}.npz")
+        for k in z.files: np.save(f"{DATA}/{split}_{k}.npy", z[k])
+    for r in RUNS: r[r.index("--data") + 1] = DATA
+    log("data unpacked into", DATA, sorted(os.listdir(DATA)))
+else:
+    log("no train.npz under /kaggle/input: every run reads its own --data path")
+
+opt = lambda run, k, d: run[run.index(k) + 1] if k in run else d
+def tag_of(run):
+    """The file prefix train_unet.py gives a run (arch, attention, encoder, seed, full)."""
+    arch, att = opt(run, "--arch", "Unet"), opt(run, "--attention", "")
+    return (("" if arch == "Unet" else arch.lower() + "_") + (att + "_" if att else "") + opt(run, "--encoder", "resnet18")
+            + "_s" + opt(run, "--seed", "42") + ("_full" if "--full" in run else ""))
+
+def model_of(run):
+    """Runs of the same model take the same time per epoch."""
+    return " ".join(opt(run, k, "") for k in ["--arch", "--attention", "--encoder", "--upscale", "--bs"])
+def work(run):
+    """Epochs, a full-data epoch counting 1.2: a third more training samples but no validation pass."""
+    return int(opt(run, "--epochs", "8")) * (1.2 if "--full" in run else 1.0)
+
+def collect(run):
+    """Copy what the analysis needs to the kernel output: summary, weights, test probabilities (final and last
+    epochs) and the best last-k validation blend, or every validation file of a run that stopped before its
+    summary. Then free the scratch disk."""
+    tag = tag_of(run); summary = f"{OUT}/{tag}.json"
+    keep = glob.glob(summary) + glob.glob(f"{OUT}/{tag}.pt") + glob.glob(f"{OUT}/{tag}_*testprob.npy")
+    if os.path.exists(summary):
+        blends = json.load(open(summary)).get("epoch_blends", {})
+        k = max(blends, key=lambda b: blends[b]["val_fss"]) if blends else None
+        keep.append(f"{OUT}/{tag}_{k}_valprob.npy" if k else f"{OUT}/{tag}_valprob.npy")
+        if k: log(f"[{tag}] best blend {k} {blends[k]['val_fss']:.4f}")
+    else:
+        keep += glob.glob(f"{OUT}/{tag}_*valprob.npy")
+    kept = []
+    for f in keep:
+        if os.path.exists(f): shutil.copy(f, WORK); kept.append(os.path.basename(f))
+    for f in glob.glob(f"{OUT}/{tag}.*") + glob.glob(f"{OUT}/{tag}_*"): os.remove(f)
+    return kept
+
+lock = threading.Lock()
+todo = list(range(len(RUNS)))  # runs not started yet, in priority order
+rate = {}                      # model -> seconds per unit of work, measured on finished runs
+procs, report, quick_failures, retried, trained_runs = {}, [], [], set(), set()
+trained_any, pinning_failed, stop = threading.Event(), threading.Event(), threading.Event()
+
+def run_one(i, device):
+    """Train RUNS[i] on one device (None: the default device), relay its log, then collect its files."""
+    env = dict(os.environ, PYTHONWARNINGS="ignore")
+    if GPU:
+        if device is not None: env.update(CUDA_VISIBLE_DEVICES=str(device))
+    else:
+        env.update(PJRT_DEVICE="TPU")
+        if device is not None:  # a one-chip TPU of its own
+            port = 8476 + device
+            env.update(TPU_VISIBLE_CHIPS=str(device), TPU_CHIPS_PER_PROCESS_BOUNDS="1,1,1", TPU_PROCESS_BOUNDS="1,1,1",
+                       TPU_PROCESS_PORT=str(port), TPU_PROCESS_ADDRESSES=f"localhost:{port}", CLOUD_TPU_TASK_ID="0",
+                       ALLOW_MULTIPLE_LIBTPU_LOAD="1")
+    t, trained = time.time(), False
+    log(f"[run{i + 1}] starts on device {device}: {tag_of(RUNS[i])}")
+    p = subprocess.Popen([sys.executable, "-u", "/kaggle/tmp/train.py"] + RUNS[i], env=env,
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    with lock: procs[i] = p
+    for line in p.stdout:  # each line gets the run number, so the kernel log tells the runs apart
+        if " train_loss " in line and not trained: trained = True; trained_any.set()
+        if re.match(r"[IW]\d{4} ", line): continue  # info and warning lines of the TPU runtime
+        print(f"[run{i + 1}] " + line, end="", flush=True)
+    p.wait(); took = time.time() - t
+    if trained: trained_runs.add(i)
+    files = collect(RUNS[i])
+    log(f"[run{i + 1}] exit code {p.returncode} after {took / 60:.1f} min, {len(files)} files kept")
+    with lock:
+        procs.pop(i, None)
+        if p.returncode == 0:
+            m = model_of(RUNS[i]); rate[m] = max(rate.get(m, 0.0), took / work(RUNS[i]))
+        report.append(dict(run=i + 1, tag=tag_of(RUNS[i]), args=" ".join(RUNS[i]), device=device, start_min=round((t - T0) / 60, 1),
+                           minutes=round(took / 60, 1), exit_code=p.returncode, trained=trained, files=files))
+        json.dump(dict(seconds_per_epoch=rate, runs=report, not_started=[j + 1 for j in todo]),
+                  open(f"{WORK}/session.json", "w"), indent=1)
+    return p.returncode, trained
+
+def estimate(run):
+    """Expected seconds for a run: from finished runs of the same model, else twice the slowest model so far."""
+    if model_of(run) in rate: return rate[model_of(run)] * work(run)
+    return 2 * max(rate.values()) * work(run) if rate else 0.0
+
+def worker(device):
+    fails = 0  # runs in a row that failed on this device before training
+    while not stop.is_set():
+        with lock:
+            now = time.time() - T0
+            i = next((j for j in todo if now + 1.1 * estimate(RUNS[j]) < BUDGET), None)
+            if i is None: return
+            todo.remove(i)
+        code, trained = run_one(i, device)
+        if code == 0 or trained: fails = 0; continue
+        fails += 1
+        with lock:
+            quick_failures.append(i)
+            if i not in retried: retried.add(i); todo.append(i)  # one more try at the end, maybe on another device
+            if len(quick_failures) >= 3 and not trained_any.is_set(): pinning_failed.set(); stop.set()
+        if fails >= 3: return log(f"device {device} retired: three runs in a row failed on it before training")
+
+def stop_all(reason):
+    stop.set(); log("stopping every run:", reason)
+    with lock: live = list(procs.values())
+    for p in live: p.terminate()
+    time.sleep(30)
+    for p in live:
+        if p.poll() is None: p.kill()
+
+pinned = True
+def watchdog():
+    """Stops every run at HARD; when nothing has trained 45 minutes into the one-device phase, gives up on it."""
+    while True:
+        time.sleep(20); el = time.time() - T0
+        if el > HARD: return stop_all("time limit")
+        if pinned and el > 45 * 60 and not trained_any.is_set() and not stop.is_set():
+            pinning_failed.set(); stop_all("nothing trained in 45 minutes with one device per run")
+threading.Thread(target=watchdog, daemon=True).start()
+
+workers = [threading.Thread(target=worker, args=(d,)) for d in DEVICES]
+for w in workers: w.start()
+for w in workers: w.join()
+pinned = False
+if pinning_failed.is_set() and time.time() - T0 < HARD:
+    with lock: rest = [j for j in range(len(RUNS)) if j not in trained_runs]; todo.clear()
+    log("one device per run did not work: runs", [j + 1 for j in rest], "go one after another on the default device")
+    stop.clear()
+    for i in rest:
+        if stop.is_set() or time.time() - T0 + 1.1 * estimate(RUNS[i]) > BUDGET: continue
+        run_one(i, None)
+log("done:", sum(r["exit_code"] == 0 for r in report), "of", len(RUNS), "runs finished,", len(todo), "never started")
