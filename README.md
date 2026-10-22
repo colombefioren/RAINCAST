@@ -19,7 +19,7 @@ at t+1h, t+2h and t+3h. Evaluated with the Fractions Skill Score (FSS) at a 1 mm
 | `src/eval_decode.py` | Out-of-sample check of the decoder against thresholds (alternate weeks). |
 | `src/eval_tta.py` | Check of shift test-time augmentation on a saved checkpoint. |
 | `src/make_submission.py` | Blend test probabilities, threshold or decode, write `submission.csv`. |
-| `src/fetch_tpu_runs.py` | Download only what the analysis needs from a TPU session's output: each run's best epoch blend. |
+| `src/fetch_runs.py` | Download only what the analysis needs from a run-queue session's output (TPU or GPU): each run's best epoch blend. |
 | `build_kernel.sh` | Bundle `fss.py` + `train_unet.py` into one file for a Kaggle GPU kernel. |
 | `build_kernel_pair.py` | Bundle two training runs into one Kaggle kernel that trains them at the same time, one per T4 GPU, for the quota of one session. |
 | `build_kernel_queue.py` | Turn a list of training runs into one Kaggle kernel that trains them side by side for one long session: one run per chip of a TPU v5e-8 machine, or with `--gpu` one run per T4 GPU. |
@@ -113,7 +113,7 @@ Turning a session's output into a submission (validation runs set the decoder, t
 predict the test set):
 
 ```bash
-python src/fetch_tpu_runs.py cocofioren/indabax-tpu-scratch-set1 outputs/tpu-set1
+python src/fetch_runs.py cocofioren/indabax-tpu-scratch-set1 outputs/tpu-set1
 cd src
 python blend.py --data ../data --out ../outputs/tpu1dec.json --decode 1 --mu 0.425,0.375,0.35 ../outputs/tpu-set1/*_valprob.npy
 python make_submission.py ../outputs/sub_tpu1.csv ../outputs/tpu1dec.json ../outputs/tpu-set1/*_full_*testprob.npy

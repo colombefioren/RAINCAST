@@ -10,7 +10,7 @@ A full TPU session leaves about 10 GB on Kaggle (see build_kernel_queue.py). Kep
   twin (the run with the same settings apart from the seed and --full), or 4 without a twin.
 Per-epoch files are deleted once averaged.
 
-Usage: python src/fetch_tpu_runs.py <owner>/<kernel-slug> <output folder>
+Usage: python src/fetch_runs.py <owner>/<kernel-slug> <output folder>
 The first argument may also be a local folder holding a downloaded output (used to test this script).
 """
 import json, os, re, shutil, subprocess, sys, numpy as np

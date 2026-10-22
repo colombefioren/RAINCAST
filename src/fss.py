@@ -10,7 +10,7 @@ WIN = 3
 
 def load_prob(path):
     """A saved probability map as float32: stored as float16 / float32, or as uint8 holding probability x 255
-    (src/fetch_tpu_runs.py stores validation blends that way to save disk)."""
+    (src/fetch_runs.py stores validation blends that way to save disk)."""
     a = np.load(path)
     return a.astype(np.float32) / 255 if a.dtype == np.uint8 else a.astype(np.float32)
 
