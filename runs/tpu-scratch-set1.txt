@@ -1,0 +1,35 @@
+# Training runs for the first Kaggle TPU session (build_kernel_tpu.py), in priority order.
+# Every model starts from random weights (rule 2.5). Each validation run (scored on the Dec 2022 - Mar 2023
+# season, trained on the other months) has a "full" twin with the same settings trained on every month: the
+# validation run chooses thresholds and ensemble weights, the twin makes the test predictions.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+# first round, one run per chip: does longer training help a model without pretrained weights?
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 62
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 162 --full
+--arch Unet --encoder resnet34 --epochs 24 --seed 63
+--arch Unet --encoder resnet34 --epochs 24 --seed 163 --full
+--arch UnetPlusPlus --encoder resnet50 --epochs 24 --seed 64
+--arch UnetPlusPlus --encoder resnet50 --epochs 24 --seed 164 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 61
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 161 --full
+
+# second round: even longer training, decoder attention, a deeper plain U-Net, second seeds of the full twins
+--arch UnetPlusPlus --encoder resnet34 --epochs 32 --seed 65
+--arch UnetPlusPlus --encoder resnet34 --epochs 32 --seed 165 --full
+--arch UnetPlusPlus --attention scse --encoder resnet34 --epochs 24 --seed 66
+--arch UnetPlusPlus --attention scse --encoder resnet34 --epochs 24 --seed 166 --full
+--arch Unet --encoder resnet50 --epochs 24 --seed 67
+--arch Unet --encoder resnet50 --epochs 24 --seed 167 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 262 --full
+--arch Unet --encoder resnet34 --epochs 24 --seed 263 --full
+
+# third round, while time remains: more seeds for the ensemble
+--arch UnetPlusPlus --encoder resnet50 --epochs 24 --seed 264 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 72
+--arch Unet --encoder resnet34 --epochs 24 --seed 73
+--arch UnetPlusPlus --encoder resnet34 --epochs 32 --seed 265 --full
+--arch UnetPlusPlus --attention scse --encoder resnet34 --epochs 24 --seed 266 --full
+--arch Unet --encoder resnet50 --epochs 24 --seed 267 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 362 --full
+--arch Unet --encoder resnet34 --epochs 24 --seed 363 --full
