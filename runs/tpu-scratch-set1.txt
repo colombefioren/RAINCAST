@@ -1,4 +1,4 @@
-# Training runs for the first Kaggle TPU session (build_kernel_tpu.py), in priority order.
+# Training runs for the first Kaggle TPU session (build_kernel_queue.py), in priority order.
 # Every model starts from random weights (rule 2.5). Each validation run (scored on the Dec 2022 - Mar 2023
 # season, trained on the other months) has a "full" twin with the same settings trained on every month: the
 # validation run chooses thresholds and ensemble weights, the twin makes the test predictions.

@@ -1,14 +1,17 @@
-"""Bundle a list of training runs into one Kaggle TPU v5e-8 kernel that trains them eight at a time, one run
-per TPU chip, for as long as the session's time budget allows.
+"""Bundle a list of training runs into one Kaggle kernel that trains them side by side, one run per device,
+for as long as the session's time budget allows. The devices are the eight chips of a TPU v5e-8 machine, or,
+with --gpu, the two GPUs of Kaggle's T4 machine.
 
-The TPU quota (20 hours a week) is separate from the GPU quota and counts session hours, so eight runs side by
-side cost the quota of one. A TPU session also waits in Kaggle's queue before it starts (often 12 hours or
-more in October 2026), so one long session that trains many runs is worth more than several short ones.
+Kaggle's GPU (30 hours a week) and TPU (20 hours a week) quotas count session hours, so runs side by side
+cost the quota of one. A TPU session also waits in Kaggle's queue before it starts (often 12 hours or more
+in October 2026), so one long session that trains many runs is worth more than several short ones; a GPU
+session starts at once but may last 12 hours, so the same reasoning holds for the weekly GPU hours.
 
 How the session runs:
-- Each run is an independent process that owns one chip: the TPU_* environment variables make every process
-  a one-chip TPU of its own, so a run that ends early does not disturb the others.
-- Eight workers, one per chip, take the next run from the list as soon as their chip is free. A worker only
+- Each run is an independent process that owns one device: CUDA_VISIBLE_DEVICES on GPU, or the TPU_*
+  environment variables that make every process a one-chip TPU of its own, so a run that ends early does
+  not disturb the others.
+- One worker per device takes the next run from the list as soon as its device is free. A worker only
   starts a run that should end within the time budget, judged from finished runs of the same model.
 - The competition arrays are unpacked once into .npy files that every run memory-maps, so the runs share one
   copy of the training data in RAM.
@@ -16,25 +19,29 @@ How the session runs:
   constraints, so it cannot replace the torch build that torch_xla needs.
 - As soon as a run ends, the files the analysis needs are copied to /kaggle/working (the kernel output) and
   its scratch files are deleted.
-- If the one-chip processes fail before training (three quick failures while nothing trained) or nothing
+- If the one-device processes fail before training (three quick failures while nothing trained) or nothing
   trains within 45 minutes, the remaining runs go one after another on the default device.
-- tpu_session.json in the output records every run: chip, start, duration, exit code and files kept.
+- session.json in the output records every run: device, start, duration, exit code and files kept.
 
-Usage: python build_kernel_tpu.py <kernel-slug> <runs-file> [budget-hours, default 7.75]
-The runs file holds a "base:" line with the train_unet.py arguments every run shares, then one run per line
-(its own arguments, in priority order); # starts a comment. Push with -t 32400, Kaggle's 9-hour TPU limit.
+Usage: python build_kernel_queue.py <kernel-slug> <runs-file> [budget-hours] [--gpu]
+The budget defaults to 7.75 hours on TPU and 10.75 hours on GPU. The runs file holds a "base:" line with the
+train_unet.py arguments every run shares, then one run per line (its own arguments, in priority order); #
+starts a comment. Push with -t 32400 for a TPU kernel (Kaggle's 9-hour TPU limit) or -t 43200 for a GPU
+kernel (12 hours).
 """
 import json, subprocess, sys
 
-slug, runs_file = sys.argv[1], sys.argv[2]
-budget_h = float(sys.argv[3]) if len(sys.argv) > 3 else 7.75
+gpu = "--gpu" in sys.argv
+argv = [x for x in sys.argv[1:] if x != "--gpu"]
+slug, runs_file = argv[0], argv[1]
+budget_h = float(argv[2]) if len(argv) > 2 else 10.75 if gpu else 7.75
 base, runs = [], []
 for line in open(runs_file):
     line = line.split("#")[0].strip()
     if line.startswith("base:"): base = line[len("base:"):].split()
     elif line: runs.append(base + line.split())
 assert base and runs, __doc__
-args = [[x.replace("/kaggle/working", "/kaggle/tmp/out") for x in r] + ["--xla", "1"] for r in runs]
+args = [[x.replace("/kaggle/working", "/kaggle/tmp/out") for x in r] + ([] if gpu else ["--xla", "1"]) for r in runs]
 assert all(r[r.index("--out") + 1] == "/kaggle/tmp/out" for r in args), "every run needs --out /kaggle/working"
 
 HELPERS = r'''opt = lambda run, k, d: run[run.index(k) + 1] if k in run else d
@@ -50,6 +57,7 @@ LAUNCHER = r'''import glob, json, os, re, shutil, subprocess, sys, threading, ti
 from importlib import metadata
 T0 = time.time()
 BUDGET, HARD = __BUDGET__, __HARD__  # seconds from now: runs must be expected to end before BUDGET; at HARD every run stops
+GPU = __GPU__  # True: one run per GPU; False: one run per TPU chip
 RUNS = __RUNS__
 OUT, DATA, WORK = "/kaggle/tmp/out", "/kaggle/tmp/data", "/kaggle/working"
 for d in (OUT, DATA): os.makedirs(d, exist_ok=True)
@@ -57,25 +65,30 @@ def log(*msg):  # one write per line, so lines from different threads do not mix
     print(f"[{(time.time() - T0) / 60:5.1f} min] " + " ".join(map(str, msg)) + "\n", end="", flush=True)
 
 # what the machine offers, for the log (commands run without a shell)
-for cmd in (["nproc"], ["free", "-g"], ["df", "-h", "/kaggle/tmp", "/kaggle/working"], [sys.executable, "--version"]):
+for cmd in [["nproc"], ["free", "-g"], ["df", "-h", "/kaggle/tmp", "/kaggle/working"], [sys.executable, "--version"]] + [["nvidia-smi", "-L"]] * GPU:
     try: subprocess.run(cmd)
     except OSError as e: print(cmd[0], "unavailable:", e, flush=True)
 installed = subprocess.run([sys.executable, "-m", "pip", "list"], capture_output=True, text=True).stdout.splitlines()
 print("\n".join(l for l in installed if re.match(r"(torch|torchvision|torch[-_]xla|libtpu(-nightly)?|numpy) ", l, re.I)), flush=True)
 
-# segmentation-models-pytorch must not replace the torch build that torch_xla was compiled against, so the
-# installed versions of the TPU stack are pip constraints
+# segmentation-models-pytorch must not replace the torch build that torch_xla (or CUDA) was compiled against,
+# so the installed versions of the torch stack are pip constraints
 pins = []
 for name in ["torch", "torchvision", "torchaudio", "torch_xla", "libtpu", "libtpu-nightly", "numpy"]:
     try: pins.append(f"{name}=={metadata.version(name)}")
     except metadata.PackageNotFoundError: pass
 open("/kaggle/tmp/pins.txt", "w").write("\n".join(pins) + "\n")
 log("pip constraints:", pins)
-imports = lambda: subprocess.run([sys.executable, "-c", "import torch_xla, segmentation_models_pytorch"]).returncode == 0
+imports = lambda: subprocess.run([sys.executable, "-c", "import segmentation_models_pytorch" + ("" if GPU else ", torch_xla")]).returncode == 0
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-c", "/kaggle/tmp/pins.txt", "segmentation-models-pytorch"])
 if not imports():  # the pinned install could not resolve: install the package code alone
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--no-deps", "segmentation-models-pytorch", "timm"])
-if not imports(): sys.exit("torch_xla or segmentation_models_pytorch does not import, see the errors above")
+if not imports(): sys.exit("segmentation_models_pytorch (or torch_xla) does not import, see the errors above")
+if GPU:
+    DEVICES = list(range(sum(l.startswith("GPU ") for l in subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True).stdout.splitlines())))
+    if not DEVICES: sys.exit("no GPU visible to nvidia-smi")
+else:
+    DEVICES = list(range(8))
 open("/kaggle/tmp/train.py", "w").write(__CODE__)
 
 # the competition arrays, unpacked once into .npy files that every run memory-maps: the runs then share one
@@ -125,16 +138,20 @@ rate = {}                      # model -> seconds per unit of work, measured on 
 procs, report, quick_failures, retried, trained_runs = {}, [], [], set(), set()
 trained_any, pinning_failed, stop = threading.Event(), threading.Event(), threading.Event()
 
-def run_one(i, chip):
-    """Train RUNS[i] on one chip (None: the default device), relay its log, then collect its files."""
-    env = dict(os.environ, PJRT_DEVICE="TPU", PYTHONWARNINGS="ignore")
-    if chip is not None:  # a one-chip TPU of its own
-        port = 8476 + chip
-        env.update(TPU_VISIBLE_CHIPS=str(chip), TPU_CHIPS_PER_PROCESS_BOUNDS="1,1,1", TPU_PROCESS_BOUNDS="1,1,1",
-                   TPU_PROCESS_PORT=str(port), TPU_PROCESS_ADDRESSES=f"localhost:{port}", CLOUD_TPU_TASK_ID="0",
-                   ALLOW_MULTIPLE_LIBTPU_LOAD="1")
+def run_one(i, device):
+    """Train RUNS[i] on one device (None: the default device), relay its log, then collect its files."""
+    env = dict(os.environ, PYTHONWARNINGS="ignore")
+    if GPU:
+        if device is not None: env.update(CUDA_VISIBLE_DEVICES=str(device))
+    else:
+        env.update(PJRT_DEVICE="TPU")
+        if device is not None:  # a one-chip TPU of its own
+            port = 8476 + device
+            env.update(TPU_VISIBLE_CHIPS=str(device), TPU_CHIPS_PER_PROCESS_BOUNDS="1,1,1", TPU_PROCESS_BOUNDS="1,1,1",
+                       TPU_PROCESS_PORT=str(port), TPU_PROCESS_ADDRESSES=f"localhost:{port}", CLOUD_TPU_TASK_ID="0",
+                       ALLOW_MULTIPLE_LIBTPU_LOAD="1")
     t, trained = time.time(), False
-    log(f"[run{i + 1}] starts on chip {chip}: {tag_of(RUNS[i])}")
+    log(f"[run{i + 1}] starts on device {device}: {tag_of(RUNS[i])}")
     p = subprocess.Popen([sys.executable, "-u", "/kaggle/tmp/train.py"] + RUNS[i], env=env,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     with lock: procs[i] = p
@@ -150,10 +167,10 @@ def run_one(i, chip):
         procs.pop(i, None)
         if p.returncode == 0:
             m = model_of(RUNS[i]); rate[m] = max(rate.get(m, 0.0), took / work(RUNS[i]))
-        report.append(dict(run=i + 1, tag=tag_of(RUNS[i]), args=" ".join(RUNS[i]), chip=chip, start_min=round((t - T0) / 60, 1),
+        report.append(dict(run=i + 1, tag=tag_of(RUNS[i]), args=" ".join(RUNS[i]), device=device, start_min=round((t - T0) / 60, 1),
                            minutes=round(took / 60, 1), exit_code=p.returncode, trained=trained, files=files))
         json.dump(dict(seconds_per_epoch=rate, runs=report, not_started=[j + 1 for j in todo]),
-                  open(f"{WORK}/tpu_session.json", "w"), indent=1)
+                  open(f"{WORK}/session.json", "w"), indent=1)
     return p.returncode, trained
 
 def estimate(run):
@@ -161,22 +178,22 @@ def estimate(run):
     if model_of(run) in rate: return rate[model_of(run)] * work(run)
     return 2 * max(rate.values()) * work(run) if rate else 0.0
 
-def worker(chip):
-    fails = 0  # runs in a row that failed on this chip before training
+def worker(device):
+    fails = 0  # runs in a row that failed on this device before training
     while not stop.is_set():
         with lock:
             now = time.time() - T0
             i = next((j for j in todo if now + 1.1 * estimate(RUNS[j]) < BUDGET), None)
             if i is None: return
             todo.remove(i)
-        code, trained = run_one(i, chip)
+        code, trained = run_one(i, device)
         if code == 0 or trained: fails = 0; continue
         fails += 1
         with lock:
             quick_failures.append(i)
-            if i not in retried: retried.add(i); todo.append(i)  # one more try at the end, maybe on another chip
+            if i not in retried: retried.add(i); todo.append(i)  # one more try at the end, maybe on another device
             if len(quick_failures) >= 3 and not trained_any.is_set(): pinning_failed.set(); stop.set()
-        if fails >= 3: return log(f"chip {chip} retired: three runs in a row failed on it before training")
+        if fails >= 3: return log(f"device {device} retired: three runs in a row failed on it before training")
 
 def stop_all(reason):
     stop.set(); log("stopping every run:", reason)
@@ -188,21 +205,21 @@ def stop_all(reason):
 
 pinned = True
 def watchdog():
-    """Stops every run at HARD; when nothing has trained 45 minutes into the one-chip phase, gives up on it."""
+    """Stops every run at HARD; when nothing has trained 45 minutes into the one-device phase, gives up on it."""
     while True:
         time.sleep(20); el = time.time() - T0
         if el > HARD: return stop_all("time limit")
         if pinned and el > 45 * 60 and not trained_any.is_set() and not stop.is_set():
-            pinning_failed.set(); stop_all("nothing trained in 45 minutes with one chip per run")
+            pinning_failed.set(); stop_all("nothing trained in 45 minutes with one device per run")
 threading.Thread(target=watchdog, daemon=True).start()
 
-workers = [threading.Thread(target=worker, args=(c,)) for c in range(8)]
+workers = [threading.Thread(target=worker, args=(d,)) for d in DEVICES]
 for w in workers: w.start()
 for w in workers: w.join()
 pinned = False
 if pinning_failed.is_set() and time.time() - T0 < HARD:
     with lock: rest = [j for j in range(len(RUNS)) if j not in trained_runs]; todo.clear()
-    log("one chip per run did not work: runs", [j + 1 for j in rest], "go one after another on the default device")
+    log("one device per run did not work: runs", [j + 1 for j in rest], "go one after another on the default device")
     stop.clear()
     for i in rest:
         if stop.is_set() or time.time() - T0 + 1.1 * estimate(RUNS[i]) > BUDGET: continue
@@ -224,11 +241,14 @@ assert len(set(tags)) == len(tags) and not clash, f"run file names collide: {cla
 
 budget = int(budget_h * 3600)
 launcher = (LAUNCHER.replace("__BUDGET__", str(budget)).replace("__HARD__", str(budget + 1500))
-            .replace("__HELPERS__", HELPERS).replace("__RUNS__", repr(args)).replace("__CODE__", repr(code)))
+            .replace("__GPU__", str(gpu)).replace("__HELPERS__", HELPERS).replace("__RUNS__", repr(args))
+            .replace("__CODE__", repr(code)))
 open(path, "w").write(launcher)
 compile(launcher, path, "exec")
 meta = f"kernel/{slug}/kernel-metadata.json"
 m = json.load(open(meta))
-m.update({"enable_gpu": "false", "enable_tpu": "true", "machine_shape": "TpuV5E8"})
+# NvidiaTeslaT4 is the machine with two T4 GPUs ("GPU T4 x2" in the notebook editor)
+m.update({"enable_gpu": "true", "enable_tpu": "false", "machine_shape": "NvidiaTeslaT4"} if gpu else
+         {"enable_gpu": "false", "enable_tpu": "true", "machine_shape": "TpuV5E8"})
 json.dump(m, open(meta, "w"), indent=1)
-print(path, f"trains {len(runs)} runs on 8 TPU chips within {budget_h} h:", ", ".join(tags))
+print(path, f"trains {len(runs)} runs on", "the GPUs" if gpu else "8 TPU chips", f"within {budget_h} h:", ", ".join(tags))

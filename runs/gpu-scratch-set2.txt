@@ -1,0 +1,16 @@
+# Training runs for the second Kaggle GPU session of Saturday 24 October, side by side with
+# gpu-scratch-set1.txt (Kaggle runs two GPU sessions at a time), built with build_kernel_queue.py --gpu.
+# Longer training first, the clearest lever so far, then a lighter decoder for ensemble diversity, then
+# one more pair of the main recipe. Each validation run has a full-data twin.
+# Expected on T4: about 9 hours in all.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+# 36 epochs: about 3.7 and 4 hours
+--arch UnetPlusPlus --encoder resnet34 --epochs 36 --seed 94
+--arch UnetPlusPlus --encoder resnet34 --epochs 36 --seed 194 --full
+# plain U-Net, 32 epochs: about 2 hours each
+--arch Unet --encoder resnet34 --epochs 32 --seed 95
+--arch Unet --encoder resnet34 --epochs 32 --seed 195 --full
+# main recipe, one more pair
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 96
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 196 --full

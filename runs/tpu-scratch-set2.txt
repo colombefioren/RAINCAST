@@ -1,4 +1,4 @@
-# Training runs for a second Kaggle TPU session (build_kernel_tpu.py), in priority order, run in an
+# Training runs for a second Kaggle TPU session (build_kernel_queue.py), in priority order, run in an
 # interactive notebook session while the first session (tpu-scratch-set1.txt) waits in the batch queue.
 # Same base settings as set 1; these runs try what set 1 does not: a higher learning rate, the
 # multi-scale FSS + soft CSI loss recipe, and longer training. Each validation run has a full-data twin.
