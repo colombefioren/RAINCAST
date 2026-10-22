@@ -31,6 +31,8 @@ p.add_argument("--aug", type=int, default=0, help="1: flips + 90-degree rotation
 p.add_argument("--dropout", type=float, default=0.0)
 p.add_argument("--stride", type=int, default=1, help="use every k-th hourly train sample")
 p.add_argument("--save_each", action="store_true", help="save test/val probs at every epoch")
+p.add_argument("--keep_epochs", type=int, default=0, help="with --save_each: keep the probabilities of only the last N "
+               "epochs on disk (0: all), which also caps the last-k epoch blends at N epochs")
 p.add_argument("--upscale", type=int, default=1, help="2: upsample inputs 2x before the encoder, downsample logits back")
 p.add_argument("--aux_reg", type=float, default=0.0, help="weight of an auxiliary head regressing log1p(rain)/2 at each lead (multi-task)")
 p.add_argument("--tta", type=int, default=0, help="1: average predictions over 8-pixel shifted copies (up, down, left, right)")
@@ -263,6 +265,10 @@ for ep in range(a.epochs):
         np.save(f"{a.out}/{tag}_ep{ep}_testprob.npy", predict(dl_te).astype(np.float16))
         if dl_va is not None:
             VAL_EPOCHS.append(f"{a.out}/{tag}_ep{ep}_valprob.npy"); np.save(VAL_EPOCHS[-1], pv.astype(np.float16))
+        if a.keep_epochs and ep >= a.keep_epochs:  # a long run on a small disk keeps only its last epochs
+            old = f"{a.out}/{tag}_ep{ep - a.keep_epochs}"
+            os.remove(f"{old}_testprob.npy")
+            if dl_va is not None: os.remove(f"{old}_valprob.npy"); VAL_EPOCHS.pop(0)
     if dl_va is not None: del pv
 
 if dl_va is not None:
@@ -283,7 +289,7 @@ if dl_va is not None:
             print(f"blend of last {k} epochs", flush=True)
             tk = tune_thresholds(pb, yv)
             sc = report(f"  last{k} tuned", masks(pb, tk), yv)
-            epoch_blends[f"last{k}"] = {"thr": tk, "val_fss": sc, "epochs": list(range(len(VAL_EPOCHS) - k, len(VAL_EPOCHS)))}
+            epoch_blends[f"last{k}"] = {"thr": tk, "val_fss": sc, "epochs": list(range(a.epochs - k, a.epochs))}
             np.save(f"{a.out}/{tag}_last{k}_valprob.npy", pb.astype(np.float16))
     json.dump({"thr": thr, "best_val": best_score, "hist": hist, "epoch_blends": epoch_blends}, open(f"{a.out}/{tag}.json", "w"), indent=1)
     for f in VAL_EPOCHS: os.remove(f)  # the last-k files now hold the same information
