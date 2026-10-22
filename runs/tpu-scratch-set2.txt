@@ -1,0 +1,25 @@
+# Training runs for a second Kaggle TPU session (build_kernel_tpu.py), in priority order, run in an
+# interactive notebook session while the first session (tpu-scratch-set1.txt) waits in the batch queue.
+# Same base settings as set 1; these runs try what set 1 does not: a higher learning rate, the
+# multi-scale FSS + soft CSI loss recipe, and longer training. Each validation run has a full-data twin.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+# first round, one run per chip (a later --lr overrides the base one)
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --lr 2e-3 --seed 82
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --lr 2e-3 --seed 182 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --csi_w 1 --ms_fss 1 --pos_w 2 --mixup 0.5 --wet_sampling 1 --seed 83
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --csi_w 1 --ms_fss 1 --pos_w 2 --mixup 0.5 --wet_sampling 1 --seed 183 --full
+--arch Unet --encoder resnet34 --epochs 32 --seed 84
+--arch Unet --encoder resnet34 --epochs 32 --seed 184 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 40 --seed 85
+--arch UnetPlusPlus --encoder resnet34 --epochs 40 --seed 185 --full
+
+# second round, while time remains: more seeds of the main recipe for the ensemble
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 86
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 186 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 286 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --lr 2e-3 --seed 282 --full
+--arch Unet --encoder resnet34 --epochs 32 --seed 284 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --csi_w 1 --ms_fss 1 --pos_w 2 --mixup 0.5 --wet_sampling 1 --seed 283 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --seed 386 --full
+--arch Unet --encoder resnet34 --epochs 24 --seed 88

@@ -4,7 +4,8 @@ import sys, json, numpy as np, pandas as pd
 out, thr_json, probs = sys.argv[1], sys.argv[2], sys.argv[3:]
 cfg = json.load(open(thr_json)); thr = cfg["thr"]; dil = cfg.get("dilate", [1, 1, 1])
 from scipy.ndimage import maximum_filter
-P = np.mean([np.load(p).astype(np.float32) for p in probs], axis=0)  # (200,3,128,128)
+from fss import load_prob
+P = np.mean([load_prob(p) for p in probs], axis=0)  # (200,3,128,128)
 pred = np.stack([maximum_filter((P[:, k] > thr[k]).astype(np.float32), size=(1, dil[k], dil[k])) * 10.0 if dil[k] > 1 else (P[:, k] > thr[k]) * 10.0 for k in range(3)], 1).astype(np.float32)
 if "decode" in cfg:  # expected-FSS decoder instead of thresholds, see src/fss_decode.py
     from fss_decode import calibrate, decode
