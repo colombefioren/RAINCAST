@@ -1,0 +1,54 @@
+# Third molab session (23 and 24 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started
+# with build_molab.py. Every plain 12- to 16-epoch U-Net++ of the second session landed at 0.710 to 0.711 (last-k
+# average, tuned thresholds) and the plain U-Net at 0.7095 in a quarter of the time, so more seeds of them add
+# little on their own. This session first tests four ways to a better single model from random weights, each
+# against that 0.710 to 0.711 band:
+# - a resnet50 encoder (the best single epoch of the ImageNet-weight runs);
+# - batch 32 with learning rate 2e-3 (larger steps, better use of the 96 GB GPU);
+# - 2x instead of 3x input upscaling (2.25 times cheaper if it holds up);
+# - shifted-copy test-time augmentation (each epoch also logs the score of the same model without it);
+# then trains validation and full-data pairs of U-Net and U-Net++ for the ensemble, as many as the 10.25 hours
+# allow (the launcher skips runs that would not end in time). Validation seeds are 6xx; each full-data twin is
+# the seed + 100. The twins of the four tests come after the first pairs, once the tests have run.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+--arch UnetPlusPlus --encoder resnet50 --epochs 12 --seed 601
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --bs 32 --lr 2e-3 --seed 602
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --upscale 2 --seed 603
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --tta 1 --seed 604
+--arch Unet --encoder resnet34 --epochs 12 --seed 605
+--arch Unet --encoder resnet34 --epochs 12 --seed 705 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 606
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 706 --full
+--arch UnetPlusPlus --encoder resnet50 --epochs 12 --seed 701 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --bs 32 --lr 2e-3 --seed 702 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --upscale 2 --seed 703 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --tta 1 --seed 704 --full
+--arch Unet --encoder resnet34 --epochs 16 --seed 607
+--arch Unet --encoder resnet34 --epochs 16 --seed 707 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 608
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 708 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 609
+--arch Unet --encoder resnet34 --epochs 12 --seed 709 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 610
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 710 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 611
+--arch Unet --encoder resnet34 --epochs 12 --seed 711 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 612
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 712 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 613
+--arch Unet --encoder resnet34 --epochs 12 --seed 713 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 614
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 714 --full
+--arch Unet --encoder resnet34 --epochs 16 --seed 615
+--arch Unet --encoder resnet34 --epochs 16 --seed 715 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 616
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 716 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 617
+--arch Unet --encoder resnet34 --epochs 12 --seed 717 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 618
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 718 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 619
+--arch Unet --encoder resnet34 --epochs 12 --seed 719 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 620
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 720 --full

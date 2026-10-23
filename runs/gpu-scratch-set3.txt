@@ -1,0 +1,30 @@
+# Training runs for the first Kaggle GPU session of the new weekly quota (Saturday 24 October, from
+# 03:00 Madagascar time), built with build_kernel_queue.py --gpu: two T4 GPUs, one run each, in priority order.
+# The molab sessions of 23 October showed that every from-scratch recipe tried lands at the same validation
+# level (last-k average with tuned thresholds: 0.710 to 0.712 for U-Net++ resnet34 at 12 to 16 epochs, for the
+# resnet50 encoder and for batch 32 with learning rate 2e-3; 0.709 for the plain U-Net), and that schedules
+# past 16 epochs overfit. So these sessions add ensemble members, not new recipes: validation and full-data
+# pairs of the strongest variants (U-Net++ resnet34 at 14 epochs, its best at 0.7117; resnet50 and the plain
+# U-Net for diversity). Validation seeds are 8xx, each full-data twin is the seed + 100 (9xx).
+# Expected on T4 (about 365 s per U-Net++ resnet34 epoch with validation): 1.2 to 2 hours per U-Net++ run,
+# under an hour per U-Net run; the launcher skips the runs that would not end within the budget.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 801
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 901 --full
+--arch UnetPlusPlus --encoder resnet50 --epochs 12 --seed 802
+--arch UnetPlusPlus --encoder resnet50 --epochs 12 --seed 902 --full
+--arch Unet --encoder resnet34 --epochs 16 --seed 803
+--arch Unet --encoder resnet34 --epochs 16 --seed 903 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 804
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 904 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 805
+--arch Unet --encoder resnet34 --epochs 12 --seed 905 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 806
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 906 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 807
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 907 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 808
+--arch Unet --encoder resnet34 --epochs 12 --seed 908 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 809
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 909 --full

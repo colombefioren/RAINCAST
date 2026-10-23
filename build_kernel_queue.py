@@ -145,6 +145,9 @@ todo = list(range(len(RUNS)))  # runs not started yet, in priority order
 rate = {}                      # model -> seconds per unit of work, measured on finished runs
 procs, report, quick_failures, retried, trained_runs = {}, [], [], set(), set()
 trained_any, pinning_failed, stop = threading.Event(), threading.Event(), threading.Event()
+# a fresh session.json at once: molab reuses its machine between jobs, and the molab worker must not upload the
+# previous job's runs as this job's results
+json.dump(dict(seconds_per_epoch=rate, runs=report, not_started=[j + 1 for j in todo]), open(f"{WORK}/session.json", "w"), indent=1)
 
 def run_one(i, device):
     """Train RUNS[i] on one device (None: the default device), relay its log, then collect its files."""
