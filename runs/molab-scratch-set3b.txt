@@ -1,0 +1,33 @@
+# Rest of the third molab session (23 October, evening). The molab sandbox of indabax-molab-set3 stopped about
+# three hours in, probably reclaimed while no browser tab was connected, after 14 of its 40 runs had finished and
+# uploaded (the four tests, s605 to s607 and their full-data twins s701 to s707). This queue holds the 26 runs it
+# did not finish, unchanged: validation and full-data pairs of U-Net and U-Net++ (seeds 608 to 620 and their
+# twins 708 to 720), built with build_kernel_queue.py --gpu --runs-per-gpu 3.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 608
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 708 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 609
+--arch Unet --encoder resnet34 --epochs 12 --seed 709 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 610
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 710 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 611
+--arch Unet --encoder resnet34 --epochs 12 --seed 711 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 612
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 712 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 613
+--arch Unet --encoder resnet34 --epochs 12 --seed 713 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 614
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 714 --full
+--arch Unet --encoder resnet34 --epochs 16 --seed 615
+--arch Unet --encoder resnet34 --epochs 16 --seed 715 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 616
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 716 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 617
+--arch Unet --encoder resnet34 --epochs 12 --seed 717 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 618
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 718 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 619
+--arch Unet --encoder resnet34 --epochs 12 --seed 719 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 620
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 720 --full
