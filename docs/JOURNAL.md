@@ -121,6 +121,8 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-23 | submission 23: `outputs/sub23_blend8_twins_decoded.csv`, the eight-run blend with full-data twins for seven of the eight runs (s191, s501 to s504, s506, s507) | 0.7680 | 0.78235 | predicted 0.781 to 0.785; first compliant score above the old ImageNet best (0.78152), 0.0089 above the next team |
 | 2026-10-23 | last second-session seeds: s409 (16 epochs), s410 and s411 (12 epochs) | last-6 with tuned thresholds 0.7109 / 0.7113 / 0.7115 | | eleven plain U-Net++ runs now span 0.7102 to 0.7115: the recipe has plateaued, so seeds only add ensemble members |
 | 2026-10-23 | third molab session queued (`runs/molab-scratch-set3.txt`, 40 runs, published for the next restart) | | | four single-model tests first: resnet50 encoder, batch 32 with learning rate 2e-3, 2x upscaling, shifted-copy test-time augmentation (`train_unet.py` now logs the unshifted score of the same model next to it); then U-Net and U-Net++ validation and full-data pairs, seeds 6xx and 7xx |
+| 2026-10-23 | blends decoded with fixed mu: every second-session run plus s60 and s91 (`outputs/blend12dec.json`), then without s60 (`outputs/blend11dec.json`) | 0.7682 / 0.7684 | | s60 (8 epochs, no full-data twin) no longer helps, and without it every member has a twin |
+| 2026-10-23 | submission 24: `outputs/sub24_blend11_twins_decoded.csv`, the eleven-run blend with the full-data twin of every run | 0.7684 | 0.78293 | predicted 0.7825 to 0.7845; public minus validation is 0.0145 with all twins (0.0144 at seven of eight in submission 23) |
 
 Superseded by submission 13 (full-data training is worth about +0.006 once decoded). Original note: from now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
@@ -141,4 +143,4 @@ Reading of submissions 4 and 5 (corrected): the full-data shift model (0.70337) 
 | 2026-10-20 | 5 |
 | 2026-10-21 | 5 |
 | 2026-10-22 | 1 |
-| 2026-10-23 | 3 (so far) |
+| 2026-10-23 | 4 (so far) |
