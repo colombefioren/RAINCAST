@@ -175,6 +175,11 @@ it, so the notebook holds no competition code: the code comes from the private d
 kaggle datasets download -d cocofioren/indabax-molab-set1-results -p outputs/molab-set1 --unzip
 ```
 
+To switch the notebook to another session (for example `indabax-molab-set2`), publish its job with
+`build_molab.py`, then use Save and restart in molab's resources menu before pasting the token and
+clicking Start training again. Re-running the cell alone is not enough: the runs of the previous job keep
+training on the GPU in the background.
+
 ## Saturn Cloud: tried, no free compute
 
 Saturn Cloud's free trial lists one T4 GPU (instance size T4-XLARGE), but its API refuses to start any
