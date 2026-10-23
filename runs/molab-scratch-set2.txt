@@ -1,0 +1,34 @@
+# Second molab session (23 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started with
+# build_molab.py. The first molab run (s91, 24 epochs) overfitted: validation FSS at threshold 0.5 peaked at
+# epoch 12 (0.7065) and fell to 0.691 by epoch 23 while the training loss kept dropping, so its last-6 blend
+# decoded to 0.7478, below the 8-epoch s60 (0.7594). This session tests the two fixes side by side:
+# - shorter schedules with the same recipe (12 and 16 epochs);
+# - stronger regularisation for longer schedules (AdamW weight decay 0.05 instead of 1e-4, dropout 0.4);
+# plus two recipes for blend diversity (multi-scale FSS + soft CSI loss with temporal mixup, and plain U-Net),
+# then more 12- and 16-epoch seeds. Validation seeds are 4xx; each full-data twin is the seed + 100.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 401
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --wd 0.05 --seed 402
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 403
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 501 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --wd 0.05 --dropout 0.4 --seed 404
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 503 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --csi_w 1 --ms_fss 1 --pos_w 2 --mixup 0.5 --wet_sampling 1 --seed 405
+--arch Unet --encoder resnet34 --epochs 12 --seed 406
+--arch UnetPlusPlus --encoder resnet34 --epochs 24 --wd 0.05 --seed 502 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 407
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 507 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --wd 0.05 --dropout 0.4 --seed 504 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --csi_w 1 --ms_fss 1 --pos_w 2 --mixup 0.5 --wet_sampling 1 --seed 505 --full
+--arch Unet --encoder resnet34 --epochs 12 --seed 506 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 408
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 508 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 409
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 509 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 410
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 510 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 411
+--arch UnetPlusPlus --encoder resnet34 --epochs 12 --seed 511 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 412
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 512 --full
