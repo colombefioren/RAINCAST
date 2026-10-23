@@ -11,8 +11,9 @@ How the session runs:
 - Each run is an independent process that owns one device: CUDA_VISIBLE_DEVICES on GPU, or the TPU_*
   environment variables that make every process a one-chip TPU of its own, so a run that ends early does
   not disturb the others.
-- One worker per device takes the next run from the list as soon as its device is free. A worker only
-  starts a run that should end within the time budget, judged from finished runs of the same model.
+- One worker per device (per run slot with --runs-per-gpu) takes the next run from the list as soon as its
+  device is free. A worker only starts a run that should end within the time budget, judged from finished
+  runs of the same model.
 - The competition arrays are unpacked once into .npy files that every run memory-maps, so the runs share one
   copy of the training data in RAM.
 - segmentation-models-pytorch is installed with the TPU stack (torch, torch_xla, ...) pinned as pip
@@ -23,16 +24,21 @@ How the session runs:
   trains within 45 minutes, the remaining runs go one after another on the default device.
 - session.json in the output records every run: device, start, duration, exit code and files kept.
 
-Usage: python build_kernel_queue.py <kernel-slug> <runs-file> [budget-hours] [--gpu]
-The budget defaults to 7.75 hours on TPU and 10.75 hours on GPU. The runs file holds a "base:" line with the
-train_unet.py arguments every run shares, then one run per line (its own arguments, in priority order); #
-starts a comment. Push with -t 32400 for a TPU kernel (Kaggle's 9-hour TPU limit) or -t 43200 for a GPU
-kernel (12 hours).
+Usage: python build_kernel_queue.py <kernel-slug> <runs-file> [budget-hours] [--gpu] [--runs-per-gpu N]
+The budget defaults to 7.75 hours on TPU and 10.75 hours on GPU. --runs-per-gpu N trains N runs side by side
+on each GPU (default 1), for a GPU much bigger than one run needs, such as molab's 96 GB (build_molab.py).
+The runs file holds a "base:" line with the train_unet.py arguments every run shares, then one run per line
+(its own arguments, in priority order); # starts a comment. Push with -t 32400 for a TPU kernel (Kaggle's
+9-hour TPU limit) or -t 43200 for a GPU kernel (12 hours).
 """
 import json, subprocess, sys
 
 gpu = "--gpu" in sys.argv
 argv = [x for x in sys.argv[1:] if x != "--gpu"]
+runs_per_gpu = 1
+if "--runs-per-gpu" in argv:
+    i = argv.index("--runs-per-gpu"); runs_per_gpu = int(argv[i + 1]); del argv[i:i + 2]
+assert gpu or runs_per_gpu == 1, "--runs-per-gpu needs --gpu"
 slug, runs_file = argv[0], argv[1]
 budget_h = float(argv[2]) if len(argv) > 2 else 10.75 if gpu else 7.75
 base, runs = [], []
@@ -58,6 +64,7 @@ from importlib import metadata
 T0 = time.time()
 BUDGET, HARD = __BUDGET__, __HARD__  # seconds from now: runs must be expected to end before BUDGET; at HARD every run stops
 GPU = __GPU__  # True: one run per GPU; False: one run per TPU chip
+RUNS_PER_GPU = __RUNS_PER_GPU__  # runs side by side on each GPU
 RUNS = __RUNS__
 OUT, DATA, WORK = "/kaggle/tmp/out", "/kaggle/tmp/data", "/kaggle/working"
 for d in (OUT, DATA): os.makedirs(d, exist_ok=True)
@@ -85,8 +92,9 @@ if not imports():  # the pinned install could not resolve: install the package c
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--no-deps", "segmentation-models-pytorch", "timm"])
 if not imports(): sys.exit("segmentation_models_pytorch (or torch_xla) does not import, see the errors above")
 if GPU:
-    DEVICES = list(range(sum(l.startswith("GPU ") for l in subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True).stdout.splitlines())))
-    if not DEVICES: sys.exit("no GPU visible to nvidia-smi")
+    n_gpus = sum(l.startswith("GPU ") for l in subprocess.run(["nvidia-smi", "-L"], capture_output=True, text=True).stdout.splitlines())
+    if not n_gpus: sys.exit("no GPU visible to nvidia-smi")
+    DEVICES = [d for d in range(n_gpus) for _ in range(RUNS_PER_GPU)]  # one worker per run slot
 else:
     DEVICES = list(range(8))
 open("/kaggle/tmp/train.py", "w").write(__CODE__)
@@ -241,8 +249,8 @@ assert len(set(tags)) == len(tags) and not clash, f"run file names collide: {cla
 
 budget = int(budget_h * 3600)
 launcher = (LAUNCHER.replace("__BUDGET__", str(budget)).replace("__HARD__", str(budget + 1500))
-            .replace("__GPU__", str(gpu)).replace("__HELPERS__", HELPERS).replace("__RUNS__", repr(args))
-            .replace("__CODE__", repr(code)))
+            .replace("__GPU__", str(gpu)).replace("__RUNS_PER_GPU__", str(runs_per_gpu))
+            .replace("__HELPERS__", HELPERS).replace("__RUNS__", repr(args)).replace("__CODE__", repr(code)))
 open(path, "w").write(launcher)
 compile(launcher, path, "exec")
 meta = f"kernel/{slug}/kernel-metadata.json"
@@ -251,4 +259,4 @@ m = json.load(open(meta))
 m.update({"enable_gpu": "true", "enable_tpu": "false", "machine_shape": "NvidiaTeslaT4"} if gpu else
          {"enable_gpu": "false", "enable_tpu": "true", "machine_shape": "TpuV5E8"})
 json.dump(m, open(meta, "w"), indent=1)
-print(path, f"trains {len(runs)} runs on", "the GPUs" if gpu else "8 TPU chips", f"within {budget_h} h:", ", ".join(tags))
+print(path, f"trains {len(runs)} runs on", f"the GPUs, {runs_per_gpu} per GPU" if gpu else "8 TPU chips", f"within {budget_h} h:", ", ".join(tags))
