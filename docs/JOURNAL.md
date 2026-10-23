@@ -108,6 +108,11 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-23 | interactive TPU session `indabax-tpu-scratch-set2` stopped while still queued (05:15 UTC, Colombe's decision): molab trains faster than the TPU queue moves | | | the batch TPU session `indabax-tpu-scratch-set1` stays queued |
 | 2026-10-23 | first molab pair: U-Net++ resnet34 3x from random weights, 24 epochs (s91 validation, 79.6 minutes; s191 full-data twin, 69.9 minutes), three runs side by side on the Blackwell GPU | 0.7478 decoded (s91 last-6 average) | | overfits: validation FSS at threshold 0.5 rises to 0.7065 at epoch 12, then falls to 0.691 at epoch 23 while the training loss keeps dropping (0.571 to 0.486). The 8-epoch s60 (0.7594) stays better. The rest of `indabax-molab-set1` (24- to 36-epoch runs) was stopped for the second molab session |
 | 2026-10-23 | `--wd` (AdamW weight decay, 1e-4 in every earlier run) added to `train_unet.py`; second molab session `indabax-molab-set2` queued | | | 24 runs: 12- and 16-epoch schedules with the s60 recipe, 24 epochs with weight decay 0.05, 16 epochs with weight decay 0.05 and dropout 0.4, the multi-scale FSS + soft CSI loss with temporal mixup, plain U-Net, then more 12- and 16-epoch seeds; validation seeds 4xx, full-data twins 5xx |
+| 2026-10-23 | 36-epoch run of the first molab session (s94, last-6 average) | 0.6744 with tuned thresholds (s91, 24 epochs: 0.6969) | | longer is worse: the overfitting grows with the schedule |
+| 2026-10-23 | blend of s60 (8 epochs, last 2) and s91 (24 epochs, last 6), decoded (`outputs/blend_s60_s91dec.json`) | 0.7631 | | +0.0037 over s60 alone: the weaker 24-epoch model still adds diversity |
+| 2026-10-23 | submission 21: `outputs/sub21_s60_s191full_decoded.csv`, s60 test probabilities + the s191 full-data twin, decoded with the calibration above | 0.7631 | 0.77698 | predicted 0.774 to 0.778 (validation + 0.011, plus about half the +0.006 full-data gain). Rule-compliant and 0.0036 above the next team (Chriskely, 0.77342) |
+| 2026-10-23 | 12-epoch U-Net++ from random weights (s401, second molab session, 47.6 minutes) | 0.7627 decoded alone (last-5 average, 0.7102 with tuned thresholds) | | best from-scratch model so far: validation at threshold 0.5 still rises at epoch 10 (0.7072) and holds at epoch 11, no overfitting. Blend with s60 and s91: 0.7656 (`outputs/blend_s60_s91_s401dec.json`) |
+| 2026-10-23 | the molab worker's first upload of the second session published the first session's runs again | | | the launcher only wrote `session.json` after a run ended, so the worker found the previous job's file in `/kaggle/working`; the launcher now writes an empty one when it starts |
 
 Superseded by submission 13 (full-data training is worth about +0.006 once decoded). Original note: from now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
@@ -128,3 +133,4 @@ Reading of submissions 4 and 5 (corrected): the full-data shift model (0.70337) 
 | 2026-10-20 | 5 |
 | 2026-10-21 | 5 |
 | 2026-10-22 | 1 |
+| 2026-10-23 | 1 (so far) |
