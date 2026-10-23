@@ -207,18 +207,21 @@ def tshift(t, dy, dx):
     out[:, :, yd, xd] = t[:, :, ys, xs]
     return out
 VIEWS = [(0, 0), (8, 0), (-8, 0), (0, 8), (0, -8)] if a.tta else [(0, 0)]
-def predict(dl):
-    """Probabilities; with --tta, the average over shifted copies, each shifted back (pixels a view lost are skipped)."""
-    model.eval(); out = []
+def predict(dl, unshifted=False):
+    """Probabilities; with --tta, the average over shifted copies, each shifted back (pixels a view lost are skipped).
+    unshifted=True also returns the plain view alone, which measures what the shifted copies add."""
+    model.eval(); out = []; plain = []
     with torch.no_grad():
         for xb, _ in dl:
             xb = xb.to(dev); acc = 0; cnt = 0
             for dy, dx in VIEWS:
                 with autocast(): logits = model(tshift(xb, dy, dx))
-                acc = acc + tshift(torch.sigmoid(logits[:, :3].float()), -dy, -dx)
+                p = tshift(torch.sigmoid(logits[:, :3].float()), -dy, -dx)
+                if unshifted and (dy, dx) == (0, 0): plain.append(p.cpu().numpy())
+                acc = acc + p
                 cnt = cnt + tshift(tshift(torch.ones_like(xb[:, :1]), dy, dx), -dy, -dx)
             out.append((acc / cnt.clamp(min=1)).cpu().numpy())
-    return np.concatenate(out)
+    return (np.concatenate(out), np.concatenate(plain)) if unshifted else np.concatenate(out)
 
 def tune_thresholds(prob, obs):
     best = []
@@ -256,9 +259,11 @@ for ep in range(a.epochs):
     tl = float(tl)
     msg = f"epoch {ep} train_loss {tl/len(dl_tr):.4f} time {time.time()-t0:.0f}s"
     if dl_va is not None:
-        pv = predict(dl_va)
+        pv, pp = predict(dl_va, unshifted=True) if a.tta else (predict(dl_va), None)
         s05 = fss_pooled(masks(pv, [0.5] * 3), yv)[0]; s03 = fss_pooled(masks(pv, [0.3] * 3), yv)[0]
         msg += f" val_fss@0.5 {s05:.4f} @0.3 {s03:.4f}"
+        if pp is not None:  # the same model without the shifted copies
+            msg += f" unshifted@0.5 {fss_pooled(masks(pp, [0.5] * 3), yv)[0]:.4f} @0.3 {fss_pooled(masks(pp, [0.3] * 3), yv)[0]:.4f}"; del pp
         score = max(s05, s03)
         if score > best_score:
             best_score = score; save_weights(f"{a.out}/{tag}.pt"); np.save(f"{a.out}/{tag}_valprob.npy", pv.astype(np.float16))
