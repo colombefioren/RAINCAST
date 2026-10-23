@@ -116,6 +116,9 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-23 | 16-epoch U-Net++ (s403) and 24-epoch U-Net++ with AdamW weight decay 0.05 (s402), second molab session | s403 last-6 0.7112 and s402 last-6 0.6975 with tuned thresholds | | 16 epochs is as good as 12 (s401: 0.7102). Weight decay 0.05 does not stop the overfitting of 24-epoch runs (s91 without it: 0.6969), so 12 to 16 epochs is the recipe; the 12-epoch full-data twin (s501) took only 24 minutes |
 | 2026-10-23 | blends decoded with fixed mu: s60 + s91 + s401 + s403 (`outputs/blend4dec.json`), then + s402 (`outputs/blend5dec.json`) | 0.7667 / 0.7672 | | the overfitted 24-epoch runs still add diversity |
 | 2026-10-23 | submission 22: `outputs/sub22_blend5_twins_decoded.csv`, the five-run blend with the full-data twins of s91 and s401 (s191, s501) in place of their validation runs | 0.7672 | 0.77935 | predicted 0.778 to 0.782; 0.0059 above the next team |
+| 2026-10-23 | more second-session runs: s404 (16 epochs, weight decay 0.05, dropout 0.4), s405 (12 epochs, CSI + multi-scale FSS loss with mixup and wet sampling), s406 (plain U-Net, 12 epochs), s407 and s408 (12 epochs, new seeds) | last-6 with tuned thresholds: s404 0.7105, s405 0.7049, s406 0.7095, s407 0.7105, s408 0.7114 (last 5: 0.7115) | | every plain 12-to-16-epoch U-Net++ lands at 0.710 to 0.711, so seeds and full-data twins are now the main lever; the plain U-Net trains about four times faster and is nearly as good; the loss recipe is the weakest member |
+| 2026-10-23 | blends decoded with fixed mu: blend5 + s404 + s406 + s407 (`outputs/blend8dec.json`), then + s405 (`outputs/blend9dec.json`) | 0.7680 / 0.7679 | | s405 adds nothing, so it stays out |
+| 2026-10-23 | submission 23: `outputs/sub23_blend8_twins_decoded.csv`, the eight-run blend with full-data twins for seven of the eight runs (s191, s501 to s504, s506, s507) | 0.7680 | 0.78235 | predicted 0.781 to 0.785; first compliant score above the old ImageNet best (0.78152), 0.0089 above the next team |
 
 Superseded by submission 13 (full-data training is worth about +0.006 once decoded). Original note: from now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
@@ -136,4 +139,4 @@ Reading of submissions 4 and 5 (corrected): the full-data shift model (0.70337) 
 | 2026-10-20 | 5 |
 | 2026-10-21 | 5 |
 | 2026-10-22 | 1 |
-| 2026-10-23 | 2 (so far) |
+| 2026-10-23 | 3 (so far) |
