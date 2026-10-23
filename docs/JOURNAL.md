@@ -113,6 +113,9 @@ Public leaderboard = score shown on Kaggle. Private leaderboard decides the fina
 | 2026-10-23 | submission 21: `outputs/sub21_s60_s191full_decoded.csv`, s60 test probabilities + the s191 full-data twin, decoded with the calibration above | 0.7631 | 0.77698 | predicted 0.774 to 0.778 (validation + 0.011, plus about half the +0.006 full-data gain). Rule-compliant and 0.0036 above the next team (Chriskely, 0.77342) |
 | 2026-10-23 | 12-epoch U-Net++ from random weights (s401, second molab session, 47.6 minutes) | 0.7627 decoded alone (last-5 average, 0.7102 with tuned thresholds) | | best from-scratch model so far: validation at threshold 0.5 still rises at epoch 10 (0.7072) and holds at epoch 11, no overfitting. Blend with s60 and s91: 0.7656 (`outputs/blend_s60_s91_s401dec.json`) |
 | 2026-10-23 | the molab worker's first upload of the second session published the first session's runs again | | | the launcher only wrote `session.json` after a run ended, so the worker found the previous job's file in `/kaggle/working`; the launcher now writes an empty one when it starts |
+| 2026-10-23 | 16-epoch U-Net++ (s403) and 24-epoch U-Net++ with AdamW weight decay 0.05 (s402), second molab session | s403 last-6 0.7112 and s402 last-6 0.6975 with tuned thresholds | | 16 epochs is as good as 12 (s401: 0.7102). Weight decay 0.05 does not stop the overfitting of 24-epoch runs (s91 without it: 0.6969), so 12 to 16 epochs is the recipe; the 12-epoch full-data twin (s501) took only 24 minutes |
+| 2026-10-23 | blends decoded with fixed mu: s60 + s91 + s401 + s403 (`outputs/blend4dec.json`), then + s402 (`outputs/blend5dec.json`) | 0.7667 / 0.7672 | | the overfitted 24-epoch runs still add diversity |
+| 2026-10-23 | submission 22: `outputs/sub22_blend5_twins_decoded.csv`, the five-run blend with the full-data twins of s91 and s401 (s191, s501) in place of their validation runs | 0.7672 | 0.77935 | predicted 0.778 to 0.782; 0.0059 above the next team |
 
 Superseded by submission 13 (full-data training is worth about +0.006 once decoded). Original note: from now on only validation runs: full-data training adds about +0.002, while validation runs give the probabilities needed to tune thresholds, blends and the decoder.
 
@@ -133,4 +136,4 @@ Reading of submissions 4 and 5 (corrected): the full-data shift model (0.70337) 
 | 2026-10-20 | 5 |
 | 2026-10-21 | 5 |
 | 2026-10-22 | 1 |
-| 2026-10-23 | 1 (so far) |
+| 2026-10-23 | 2 (so far) |
