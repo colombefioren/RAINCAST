@@ -1,5 +1,6 @@
 """U-Net rain nowcasting trained to maximise FSS(1 mm/h, 3x3).
-Inputs: 3 rain maps (log1p), lat, lon, hour sin/cos, season-day. Outputs: P(rain > 1 mm/h) at +1h,+2h,+3h.
+Inputs: 3 rain maps (log1p), lat, lon, hour sin/cos, season-day (optionally advected maps and a rain
+climatology). Outputs: P(rain > 1 mm/h) at +1h,+2h,+3h.
 Loss: BCE + soft FSS. Validation: last season (Dec 2022 - Mar 2023). Thresholds tuned on validation."""
 import argparse, time, json, numpy as np, pandas as pd, torch, torch.nn as nn, torch.nn.functional as F
 import segmentation_models_pytorch as smp
@@ -42,6 +43,8 @@ p.add_argument("--tta", type=int, default=0, help="1: average predictions over 8
 p.add_argument("--eval_bs", type=int, default=64, help="batch size for validation and test predictions (lower it if they run out of GPU memory)")
 p.add_argument("--amp", type=int, default=0, help="1: mixed precision (float16 forward pass with loss scaling) on GPU, faster and lighter")
 p.add_argument("--advect", type=int, default=0, help="1: add optical-flow advected maps (+1h,+2h,+3h) as input channels")
+p.add_argument("--clim", type=int, default=0, help="1: add 3 climatology channels: how often each pixel had rain > 1 mm/h "
+               "at the hour of day of each lead time (+1h, +2h, +3h), counted on the training split only")
 p.add_argument("--xla", type=int, default=0, help="1: train on one TPU chip through PyTorch/XLA (Kaggle TPU v5e-8); "
                "--amp 1 then means bfloat16 autocast, which needs no loss scaling")
 a = p.parse_args()
@@ -82,7 +85,7 @@ val = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")) if not a.full else 
 
 ADV, ADVt = (advect_batch(X), advect_batch(Xt)) if a.advect else (None, None)
 if a.advect: print("advected inputs ready", ADV.shape, flush=True)
-N_IN = 8 + (3 if a.advect else 0)
+N_IN = 8 + (3 if a.advect else 0) + (3 if a.clim else 0)
 N_OUT = 6 if a.aux_reg > 0 else 3
 # fixed coordinate channels (CoordConv): standardised row and column index, the same for every sample, so the
 # network can learn location-dependent behaviour while each forecast reads only its three rain maps and its
@@ -104,7 +107,8 @@ class Rows:
     def __getitem__(self, i): return self.arr[self.idx[i]]
 
 class DS(torch.utils.data.Dataset):
-    def __init__(self, X, y, tf, aug=0, adv=None, mixup=0.0): self.X, self.y, self.tf, self.aug, self.adv, self.mixup = X, y, tf, aug, adv, mixup
+    def __init__(self, X, y, tf, aug=0, adv=None, mixup=0.0, ch=None):
+        self.X, self.y, self.tf, self.aug, self.adv, self.mixup, self.ch = X, y, tf, aug, adv, mixup, ch
     def __len__(self): return len(self.X)
     def target(self, i):
         """3 binary rain maps (> 1 mm/h); with --aux_reg also 3 maps of log1p(rain)/2."""
@@ -117,6 +121,7 @@ class DS(torch.utils.data.Dataset):
         tfe = np.broadcast_to(self.tf[i][:, None, None], (3, H, W))
         parts = [x, row_c[None], col_c[None], tfe]
         if self.adv is not None: parts.append(np.log1p(np.maximum(self.adv[i], 0)) / 2.0)
+        if self.ch is not None: parts.append(CLIM[self.ch[i]])
         inp = np.concatenate(parts, 0).astype(np.float32)
         tgt = self.target(i) if self.y is not None else np.zeros((N_OUT, H, W), np.float32)
         if self.mixup > 0 and self.y is not None and i + 1 < len(self.X) and np.random.rand() < self.mixup:
@@ -124,6 +129,7 @@ class DS(torch.utils.data.Dataset):
             x2 = np.log1p(np.maximum(self.X[i + 1], 0)) / 2.0
             parts2 = [x2, row_c[None], col_c[None], np.broadcast_to(self.tf[i + 1][:, None, None], (3, H, W))]
             if self.adv is not None: parts2.append(np.log1p(np.maximum(self.adv[i + 1], 0)) / 2.0)
+            if self.ch is not None: parts2.append(CLIM[self.ch[i + 1]])
             inp = lam * inp + (1 - lam) * np.concatenate(parts2, 0).astype(np.float32)
             tgt = lam * tgt + (1 - lam) * self.target(i + 1)
         if self.aug == 1:  # rotations and flips: break the geographic motion prior, kept for reference
@@ -145,7 +151,29 @@ class DS(torch.utils.data.Dataset):
 tf_tr, tf_te = time_feats(ts), time_feats(tst)
 tr_idx = np.where(~val)[0][::a.stride]
 sub = lambda arr, idx: None if arr is None else arr[idx]
-ds_tr = DS(Rows(X, tr_idx), Rows(y, tr_idx), tf_tr[tr_idx], a.aug, sub(ADV, tr_idx), a.mixup)
+
+def lead_hours(t):
+    """Hour of day of the three lead times (+1h, +2h, +3h) of each sample: the rows of CLIM it reads."""
+    return ((t.hour.values[:, None] + np.arange(1, 4)) % 24).astype(np.int64)
+
+def climatology(rows):
+    """Frequency of rain > 1 mm/h per hour of day and pixel over the given training rows (their three target
+    maps, each at its own hour), smoothed over +-1 hour and 5x5 pixels, then standardised. Validation runs count
+    the training split only; full-data runs count every row, like their training."""
+    from scipy.ndimage import uniform_filter
+    H, W = y.shape[-2:]; wet, n = np.zeros((24, H, W)), np.zeros(24)
+    for s in range(0, len(rows), 512):
+        r = rows[s:s + 512]; hrs = lead_hours(ts[r]); yb = np.asarray(y[r]) > 1.0
+        for k in range(3):
+            np.add.at(wet, hrs[:, k], yb[:, k]); np.add.at(n, hrs[:, k], 1)
+    wet, n = sum(np.roll(wet, d, 0) for d in (-1, 0, 1)), sum(np.roll(n, d) for d in (-1, 0, 1))
+    freq = uniform_filter(wet / np.maximum(n, 1)[:, None, None], size=(1, 5, 5), mode="nearest")
+    return ((freq - freq.mean()) / freq.std()).astype(np.float32)
+
+CLIM = climatology(np.where(~val)[0]) if a.clim else None
+CH, CHt = (lead_hours(ts), lead_hours(tst)) if a.clim else (None, None)
+if a.clim: print("climatology ready", CLIM.shape, flush=True)
+ds_tr = DS(Rows(X, tr_idx), Rows(y, tr_idx), tf_tr[tr_idx], a.aug, sub(ADV, tr_idx), a.mixup, sub(CH, tr_idx))
 if a.wet_sampling:
     wet = np.array([(y[j] > 1.0).mean() for j in tr_idx])
     wts = torch.tensor(0.02 + wet / max(wet.mean(), 1e-6), dtype=torch.double)
@@ -154,8 +182,8 @@ if a.wet_sampling:
 else:
     dl_tr = torch.utils.data.DataLoader(ds_tr, batch_size=a.bs, shuffle=True, num_workers=2, drop_last=True)
 va_idx = np.where(val)[0]
-dl_va = torch.utils.data.DataLoader(DS(Rows(X, va_idx), Rows(y, va_idx), tf_tr[val], 0, sub(ADV, val)), batch_size=a.eval_bs, num_workers=2) if val.any() else None
-dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt), batch_size=a.eval_bs, num_workers=2)
+dl_va = torch.utils.data.DataLoader(DS(Rows(X, va_idx), Rows(y, va_idx), tf_tr[val], 0, sub(ADV, val), ch=sub(CH, val)), batch_size=a.eval_bs, num_workers=2) if val.any() else None
+dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt, ch=CHt), batch_size=a.eval_bs, num_workers=2)
 
 extra = {"decoder_attention_type": a.attention} if a.attention else {}
 model = getattr(smp, a.arch)(a.encoder, encoder_weights="imagenet" if a.pretrained else None, in_channels=N_IN, classes=N_OUT, **extra).to(dev)
@@ -233,7 +261,7 @@ def tune_thresholds(prob, obs):
     return best
 
 import os; os.makedirs(a.out, exist_ok=True)
-tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
+tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + ("clim_" if a.clim else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
 def masks(prob, thr):
     """Rain maps (0 or 10 mm/h) from one threshold per lead, in float32 to keep memory low."""
     return np.stack([prob[:, j] > thr[j] for j in range(3)], 1).astype(np.float32) * np.float32(10.0)
