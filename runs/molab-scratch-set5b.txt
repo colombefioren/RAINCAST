@@ -1,30 +1,21 @@
-# Rest of the fifth molab session (24 October, evening). The molab sandbox of indabax-molab-set5 stopped between
-# 18:48 and 20:42 Madagascar time, with no laptop suspend in the system log, after its first three runs had
-# finished and uploaded (climatology validation runs s1203 to s1205), probably out of memory once the advection
-# runs started: each held its 2.1 GB of advected maps about twice (the array and copies of its training and
-# validation rows), in a sandbox of 32 GB (train_unet.py now shares one memory-mapped copy between runs). Four
-# advection validation runs moved to Kaggle's GPU quota (runs/gpu-adv-test.txt, runs/gpu-adv-clim-test.txt:
-# s1221, s1222, s1231, s1232). The 33 runs left come climatology first (twins of s1203 to s1205, then more
-# pairs), then the advection twins and pairs, built with build_kernel_queue.py --gpu --runs-per-gpu 3.
+# Rest of the fifth molab session (24 October, evening), climatology runs only. The molab sandbox of
+# indabax-molab-set5 stopped between 18:48 and 20:42 Madagascar time, with no laptop suspend in the system log,
+# after its first three runs had finished and uploaded (climatology validation runs s1203 to s1205), probably out
+# of memory once the advection runs started: each held its 2.1 GB of advected maps about twice (the array and
+# copies of its training and validation rows) in a sandbox of 32 GB (train_unet.py now shares one memory-mapped
+# copy between runs). Since then the advection tests on Kaggle (runs/gpu-adv-test.txt,
+# runs/gpu-adv-clim-test.txt) showed that neither advected maps nor advected maps with the climatology add to the
+# blend, while every climatology run so far did (blend32cw2: 0.76909 against 0.76857 for blend27). Kaggle trains
+# the twins of s1203 to s1205 and the validation run s1206 (runs/gpu-clim-twins.txt, runs/gpu-clim-pair.txt).
+# This queue holds the twin of s1206, then climatology validation and full-data pairs, seeds 1207 to 1220 (twins
+# 1307 to 1320), built with build_kernel_queue.py --gpu --runs-per-gpu 3.
 base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
 
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1303 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1304 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1305 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1206
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1306 --full
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1207
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1307 --full
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1208
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1308 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --seed 1321 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --seed 1322 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --seed 1223
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --seed 1323 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --clim 1 --seed 1331 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --clim 1 --seed 1332 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --clim 1 --seed 1233
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --clim 1 --seed 1333 --full
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1209
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1309 --full
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1210
@@ -33,11 +24,19 @@ base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1311 --full
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1212
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1312 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --seed 1224
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --seed 1324 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --seed 1225
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --seed 1325 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --clim 1 --seed 1234
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --clim 1 --seed 1334 --full
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --clim 1 --seed 1235
---arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --clim 1 --seed 1335 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1213
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1313 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1214
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1314 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1215
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1315 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1216
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1316 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1217
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1317 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1218
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1318 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1219
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1319 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1220
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1320 --full
