@@ -1,0 +1,17 @@
+{
+ "id": "cocofioren/indabax-gpu-adv-clim-test",
+ "title": "indabax-gpu-adv-clim-test",
+ "code_file": "indabax-gpu-adv-clim-test.py",
+ "language": "python",
+ "kernel_type": "script",
+ "is_private": "true",
+ "enable_gpu": "true",
+ "enable_internet": "true",
+ "dataset_sources": [],
+ "competition_sources": [
+  "hackathon-IndabaX-MDG-2026"
+ ],
+ "kernel_sources": [],
+ "enable_tpu": "false",
+ "machine_shape": "NvidiaTeslaT4"
+}
