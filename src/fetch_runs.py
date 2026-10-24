@@ -7,15 +7,18 @@ A full TPU session leaves about 10 GB on Kaggle (see build_kernel_queue.py). Kep
   test probability of the same k epochs, both under the blend's name (e.g. <tag>_last3_valprob.npy and
   <tag>_last3_testprob.npy, the pair src/blend.py expects);
 - for every full-data run: the mean test probability of its last k epochs, with k taken from its validation
-  twin (the run with the same settings apart from the seed and --full), or 4 without a twin.
+  twin (the run with the same settings apart from the seed and --full), or a default without a twin in the
+  session (4, or the optional third argument: 6 for the twins of 14-epoch runs, whose validation runs all pick
+  their last 6 epochs, when they train in a session of their own).
 Per-epoch files are deleted once averaged.
 
-Usage: python src/fetch_runs.py <owner>/<kernel-slug> <output folder>
+Usage: python src/fetch_runs.py <owner>/<kernel-slug> <output folder> [last-k for full-data runs without a twin]
 The first argument may also be a local folder holding a downloaded output (used to test this script).
 """
 import json, os, re, shutil, subprocess, sys, numpy as np
 
 source, out = sys.argv[1], sys.argv[2]
+DEFAULT_K = int(sys.argv[3]) if len(sys.argv) > 3 else 4
 KAGGLE = os.environ.get("KAGGLE", "kaggle")
 os.makedirs(out, exist_ok=True)
 
@@ -68,5 +71,5 @@ for r in runs:
     if "--full" not in r["args"].split(): continue
     a = r["args"].split(); n_ep = int(a[a.index("--epochs") + 1]) if "--epochs" in a else 8
     twin = twin_key(r["args"]) in best
-    k, epochs = best[twin_key(r["args"])] if twin else ("last4", list(range(n_ep - 4, n_ep)))
+    k, epochs = best[twin_key(r["args"])] if twin else (f"last{DEFAULT_K}", list(range(n_ep - DEFAULT_K, n_ep)))
     if mean_test(r["tag"], k, epochs): print(f"{r['tag']}: {k} (epochs {epochs})", "from its validation twin" if twin else "by default, no validation twin")
