@@ -1,0 +1,9 @@
+# First test of the rain-climatology input (train_unet.py --clim 1) on the Kaggle GPU quota left after the
+# Saturday jobs: two 14-epoch U-Net++ validation runs, then their full-data twins. Every plain 14-epoch U-Net++
+# so far landed at 0.7111 to 0.7134 (last-k average, tuned thresholds), so a gain shows as both seeds above that.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1201
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1202
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1301 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --seed 1302 --full
