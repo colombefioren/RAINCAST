@@ -52,9 +52,11 @@ assert all(r[r.index("--out") + 1] == "/kaggle/tmp/out" for r in args), "every r
 
 HELPERS = r'''opt = lambda run, k, d: run[run.index(k) + 1] if k in run else d
 def tag_of(run):
-    """The file prefix train_unet.py gives a run (arch, attention, climatology, encoder, seed, full)."""
-    arch, att, clim = opt(run, "--arch", "Unet"), opt(run, "--attention", ""), opt(run, "--clim", "0") != "0"
-    return (("" if arch == "Unet" else arch.lower() + "_") + (att + "_" if att else "") + ("clim_" if clim else "") + opt(run, "--encoder", "resnet18")
+    """The file prefix train_unet.py gives a run (arch, attention, advection, climatology, encoder, seed, full)."""
+    arch, att = opt(run, "--arch", "Unet"), opt(run, "--attention", "")
+    adv, clim = opt(run, "--advect", "0") != "0", opt(run, "--clim", "0") != "0"
+    return (("" if arch == "Unet" else arch.lower() + "_") + (att + "_" if att else "") + ("adv_" if adv else "") + ("clim_" if clim else "")
+            + opt(run, "--encoder", "resnet18")
             + "_s" + opt(run, "--seed", "42") + ("_full" if "--full" in run else ""))
 '''
 exec(HELPERS)  # the builder checks file names with the same helpers the launcher uses
