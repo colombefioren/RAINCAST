@@ -1,0 +1,45 @@
+# Fourth molab session (24 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started with
+# build_molab.py. Every U-Net and U-Net++ recipe trained from random weights has settled at 0.709 to 0.713 (last-k
+# average, tuned thresholds), and the 31-run blend gains almost nothing per extra seed of them. This session first
+# tests decoders the blend has not seen yet, for diversity more than for a better single model:
+# - FPN and DeepLabV3+ with the resnet34 encoder (12 epochs), at the usual 3x upscaling and at 4x, where their
+#   quarter-resolution output matches the 128x128 target grid;
+# - U-Net++ with squeeze-and-excitation attention in the decoder (14 epochs), lost to a memory error on Kaggle on
+#   21 October and never measured.
+# Then the full-data twins of the tests (seed + 100) and validation and full-data pairs of the best recipe so far,
+# 14-epoch U-Net++ (s606 0.7117, s614 0.7127), then 16-epoch U-Net++ pairs. No U-Net pairs: U-Net members lower the
+# blend (31 runs with 9 U-Nets 0.7681, the 21 U-Net++ runs alone 0.7685). Seeds 1001 to 1016, twins 1101 to 1116.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+--arch FPN --encoder resnet34 --epochs 12 --seed 1001
+--arch FPN --encoder resnet34 --epochs 12 --upscale 4 --seed 1002
+--arch DeepLabV3Plus --encoder resnet34 --epochs 12 --seed 1003
+--arch DeepLabV3Plus --encoder resnet34 --epochs 12 --upscale 4 --seed 1004
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --attention scse --seed 1005
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1006
+--arch FPN --encoder resnet34 --epochs 12 --seed 1101 --full
+--arch FPN --encoder resnet34 --epochs 12 --upscale 4 --seed 1102 --full
+--arch DeepLabV3Plus --encoder resnet34 --epochs 12 --seed 1103 --full
+--arch DeepLabV3Plus --encoder resnet34 --epochs 12 --upscale 4 --seed 1104 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --attention scse --seed 1105 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1106 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1007
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1107 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1008
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1108 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1009
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1109 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1010
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1110 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1011
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1111 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1012
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --seed 1112 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 1013
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 1113 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 1014
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 1114 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 1015
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 1115 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 1016
+--arch UnetPlusPlus --encoder resnet34 --epochs 16 --seed 1116 --full
