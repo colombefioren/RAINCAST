@@ -1,0 +1,17 @@
+{
+ "id": "cocofioren/indabax-gpu-clim-pair",
+ "title": "indabax-gpu-clim-pair",
+ "code_file": "indabax-gpu-clim-pair.py",
+ "language": "python",
+ "kernel_type": "script",
+ "is_private": "true",
+ "enable_gpu": "true",
+ "enable_internet": "true",
+ "dataset_sources": [],
+ "competition_sources": [
+  "hackathon-IndabaX-MDG-2026"
+ ],
+ "kernel_sources": [],
+ "enable_tpu": "false",
+ "machine_shape": "NvidiaTeslaT4"
+}
