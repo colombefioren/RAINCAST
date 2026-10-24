@@ -1,0 +1,6 @@
+# Companion of runs/gpu-adv-test.txt, run at the same time in a second Kaggle GPU session: two 14-epoch U-Net++
+# validation runs that see both extra inputs, the advected maps (--advect 1) and the rain climatology (--clim 1).
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --clim 1 --seed 1231
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --clim 1 --seed 1232

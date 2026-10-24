@@ -83,7 +83,25 @@ if a.limit: X, y, times = X[:a.limit], y[:a.limit], times[:a.limit]
 ts = pd.to_datetime(times); tst = pd.to_datetime(tt)
 val = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")) if not a.full else np.zeros(len(ts), bool)
 
-ADV, ADVt = (advect_batch(X), advect_batch(Xt)) if a.advect else (None, None)
+def advected():
+    """Advected maps of the training and test samples. In a run queue (data unpacked to .npy files) the first run
+    saves the training maps next to the data and every run memory-maps that file, so the runs that share a
+    machine hold one copy (2.1 GB) instead of one each, which matters with three runs in molab's 32 GB sandbox."""
+    if not a.advect: return None, None
+    cache = f"{a.data}/train_adv.npy"
+    if a.limit or not os.path.exists(f"{a.data}/train_X.npy"): return advect_batch(X), advect_batch(Xt)
+    try:
+        os.close(os.open(f"{cache}.lock", os.O_CREAT | os.O_EXCL))  # this run computes the file
+        tmp = f"{a.data}/train_adv_{os.getpid()}.npy"
+        np.save(tmp, advect_batch(X)); os.replace(tmp, cache)
+    except FileExistsError:  # another run is computing it: wait up to 30 minutes, then compute it here
+        for _ in range(360):
+            if os.path.exists(cache): break
+            time.sleep(5)
+    if not os.path.exists(cache): return advect_batch(X), advect_batch(Xt)
+    return np.load(cache, mmap_mode="r"), advect_batch(Xt)
+
+ADV, ADVt = advected()
 if a.advect: print("advected inputs ready", ADV.shape, flush=True)
 N_IN = 8 + (3 if a.advect else 0) + (3 if a.clim else 0)
 N_OUT = 6 if a.aux_reg > 0 else 3
@@ -151,6 +169,7 @@ class DS(torch.utils.data.Dataset):
 tf_tr, tf_te = time_feats(ts), time_feats(tst)
 tr_idx = np.where(~val)[0][::a.stride]
 sub = lambda arr, idx: None if arr is None else arr[idx]
+view = lambda arr, idx: None if arr is None else Rows(arr, idx)  # no copy: the advected maps are 2.1 GB
 
 def lead_hours(t):
     """Hour of day of the three lead times (+1h, +2h, +3h) of each sample: the rows of CLIM it reads."""
@@ -173,7 +192,7 @@ def climatology(rows):
 CLIM = climatology(np.where(~val)[0]) if a.clim else None
 CH, CHt = (lead_hours(ts), lead_hours(tst)) if a.clim else (None, None)
 if a.clim: print("climatology ready", CLIM.shape, flush=True)
-ds_tr = DS(Rows(X, tr_idx), Rows(y, tr_idx), tf_tr[tr_idx], a.aug, sub(ADV, tr_idx), a.mixup, sub(CH, tr_idx))
+ds_tr = DS(Rows(X, tr_idx), Rows(y, tr_idx), tf_tr[tr_idx], a.aug, view(ADV, tr_idx), a.mixup, sub(CH, tr_idx))
 if a.wet_sampling:
     wet = np.array([(y[j] > 1.0).mean() for j in tr_idx])
     wts = torch.tensor(0.02 + wet / max(wet.mean(), 1e-6), dtype=torch.double)
@@ -182,7 +201,7 @@ if a.wet_sampling:
 else:
     dl_tr = torch.utils.data.DataLoader(ds_tr, batch_size=a.bs, shuffle=True, num_workers=2, drop_last=True)
 va_idx = np.where(val)[0]
-dl_va = torch.utils.data.DataLoader(DS(Rows(X, va_idx), Rows(y, va_idx), tf_tr[val], 0, sub(ADV, val), ch=sub(CH, val)), batch_size=a.eval_bs, num_workers=2) if val.any() else None
+dl_va = torch.utils.data.DataLoader(DS(Rows(X, va_idx), Rows(y, va_idx), tf_tr[val], 0, view(ADV, va_idx), ch=sub(CH, val)), batch_size=a.eval_bs, num_workers=2) if val.any() else None
 dl_te = torch.utils.data.DataLoader(DS(Xt, None, tf_te, 0, ADVt, ch=CHt), batch_size=a.eval_bs, num_workers=2)
 
 extra = {"decoder_attention_type": a.attention} if a.attention else {}
