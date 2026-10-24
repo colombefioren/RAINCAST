@@ -261,7 +261,7 @@ def tune_thresholds(prob, obs):
     return best
 
 import os; os.makedirs(a.out, exist_ok=True)
-tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + ("clim_" if a.clim else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
+tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + ("adv_" if a.advect else "") + ("clim_" if a.clim else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
 def masks(prob, thr):
     """Rain maps (0 or 10 mm/h) from one threshold per lead, in float32 to keep memory low."""
     return np.stack([prob[:, j] > thr[j] for j in range(3)], 1).astype(np.float32) * np.float32(10.0)
