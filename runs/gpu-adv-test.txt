@@ -1,0 +1,9 @@
+# First test of the advection input (train_unet.py --advect 1) from scratch, on the Kaggle GPU quota left before
+# the deadline (7.4 hours on 24 October, no refresh until after it), while the molab sandbox waits for a restart:
+# two 14-epoch U-Net++ validation runs, one per T4. Advected maps were last tried on 20 October with pretrained
+# U-Nets at a much lower level. A gain shows less in the single scores than in the blend, as with the
+# climatology input.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --seed 1221
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --advect 1 --seed 1222
