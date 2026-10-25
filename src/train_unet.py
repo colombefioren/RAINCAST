@@ -199,6 +199,12 @@ def finished(counts, rows, axis=None):
     m, sd = out[0].mean(axis=axis, keepdims=True), out[0].std(axis=axis, keepdims=True)
     return np.stack([(t - m) / sd for t in out]).astype(np.float32)
 
+def per_hour(hrs, maps):
+    """Sum of the 0/1 maps (n, H, W) per hour of day hrs (n,), shape (24, H, W): a float32 matrix product, much
+    faster than np.add.at and still exact (whole numbers below 2**24)."""
+    n, H, W = maps.shape
+    return (np.eye(24, dtype=np.float32)[hrs].T @ maps.reshape(n, -1).astype(np.float32)).reshape(24, H, W)
+
 def climatology(rows):
     """Frequency of rain > 1 mm/h per hour of day and pixel over the given training rows (their three target
     maps, each at its own hour), smoothed over +-1 hour and 5x5 pixels (see finished()). Validation runs count
@@ -208,7 +214,7 @@ def climatology(rows):
     for s in range(0, len(rows), 512):
         r = rows[s:s + 512]; hrs = lead_hours(ts[r]); yb = np.asarray(y[r]) > 1.0
         for k in range(3):
-            np.add.at(wet, hrs[:, k], yb[:, k]); np.add.at(n, hrs[:, k], 1)
+            wet += per_hour(hrs[:, k], yb[:, k]); np.add.at(n, hrs[:, k], 1)
     def finish(wet, n):
         wet, n = sum(np.roll(wet, d, 0) for d in (-1, 0, 1)), sum(np.roll(n, d) for d in (-1, 0, 1))
         return uniform_filter(wet / np.maximum(n, 1)[:, None, None], size=(1, 5, 5), mode="nearest")
@@ -226,7 +232,7 @@ def transitions(rows):
         r = rows[s:s + 512]; hrs = lead_hours(ts[r]); now = np.asarray(X[r, 2]) > 1.0; yb = np.asarray(y[r]) > 1.0
         for k in range(3):
             for j, state in enumerate((~now, now)):
-                np.add.at(wet[k, j], hrs[:, k], yb[:, k] & state); np.add.at(n[k, j], hrs[:, k], state)
+                wet[k, j] += per_hour(hrs[:, k], yb[:, k] & state); n[k, j] += per_hour(hrs[:, k], state)
     def finish(wet, n):
         wet, n = sum(np.roll(wet, d, 2) for d in (-1, 0, 1)), sum(np.roll(n, d, 2) for d in (-1, 0, 1))
         box = lambda c: uniform_filter(c, size=(1, 1, 1, 5, 5), mode="nearest")
@@ -236,9 +242,10 @@ def transitions(rows):
 NB_EDGES = [1e-6, 0.15]  # rain share of the 9x9 neighbourhood at the forecast time: none, up to 15%, more
 
 def neighbourhood_bins(now):
-    """Bin of each pixel's 9x9 neighbourhood rain share (> 1 mm/h) in a rain map at the forecast time."""
+    """Bin of each pixel's 9x9 neighbourhood rain share (> 1 mm/h) in rain maps at the forecast time (..., H, W)."""
     from scipy.ndimage import uniform_filter
-    return np.digitize(uniform_filter((np.asarray(now) > 1.0).astype(np.float32), size=9, mode="constant"), NB_EDGES)
+    now = np.asarray(now)
+    return np.digitize(uniform_filter((now > 1.0).astype(np.float32), size=(1,) * (now.ndim - 2) + (9, 9), mode="constant"), NB_EDGES)
 
 def conditioned(rows):
     """Per lead time, neighbourhood bin, hour of day of the lead time and pixel: how often rain > 1 mm/h followed
@@ -248,10 +255,10 @@ def conditioned(rows):
     H, W = y.shape[-2:]; wet, n = np.zeros((3, 3, 24, H, W)), np.zeros((3, 3, 24, H, W))
     for s in range(0, len(rows), 256):
         r = rows[s:s + 256]; hrs = lead_hours(ts[r]); yb = np.asarray(y[r]) > 1.0
-        nb = np.stack([neighbourhood_bins(m) for m in np.asarray(X[r, 2])])
+        nb = neighbourhood_bins(X[r, 2])
         for k in range(3):
             for b in range(3):
-                np.add.at(wet[k, b], hrs[:, k], yb[:, k] & (nb == b)); np.add.at(n[k, b], hrs[:, k], nb == b)
+                wet[k, b] += per_hour(hrs[:, k], yb[:, k] & (nb == b)); n[k, b] += per_hour(hrs[:, k], nb == b)
     def finish(wet, n):
         wet, n = sum(np.roll(wet, d, 2) for d in (-1, 0, 1)), sum(np.roll(n, d, 2) for d in (-1, 0, 1))
         box = lambda c: uniform_filter(c, size=(1, 1, 1, 5, 5), mode="nearest")
