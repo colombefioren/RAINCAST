@@ -62,7 +62,7 @@ def fit(P, obs, table, now, prev, hours, chunk=100, seed=0):
                + 1e-5 * model.weight.pow(2).sum()
         loss.backward(); return loss
     opt.step(closure)
-    return {"mean": mean.tolist(), "std": std.tolist(), "weight": model.weight[0].tolist(), "bias": float(model.bias)}
+    return {"mean": mean.tolist(), "std": std.tolist(), "weight": model.weight[0].tolist(), "bias": float(model.bias.detach())}
 
 def apply(P, table, model, now, prev, hours, chunk=100):
     """Context-calibrated probabilities (n, H, W) of blend probabilities P (n, H, W) of one lead time."""
