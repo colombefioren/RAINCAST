@@ -44,7 +44,9 @@ p.add_argument("--eval_bs", type=int, default=64, help="batch size for validatio
 p.add_argument("--amp", type=int, default=0, help="1: mixed precision (float16 forward pass with loss scaling) on GPU, faster and lighter")
 p.add_argument("--advect", type=int, default=0, help="1: add optical-flow advected maps (+1h,+2h,+3h) as input channels")
 p.add_argument("--clim", type=int, default=0, help="1: add 3 climatology channels: how often each pixel had rain > 1 mm/h "
-               "at the hour of day of each lead time (+1h, +2h, +3h), counted on the training split only")
+               "at the hour of day of each lead time (+1h, +2h, +3h), counted on the training split only; 2: also 6 "
+               "storm start and persistence channels (how often rain follows where the pixel is dry, or already wet, "
+               "at the forecast time, per lead time and its hour of day)")
 p.add_argument("--xla", type=int, default=0, help="1: train on one TPU chip through PyTorch/XLA (Kaggle TPU v5e-8); "
                "--amp 1 then means bfloat16 autocast, which needs no loss scaling")
 a = p.parse_args()
@@ -103,7 +105,7 @@ def advected():
 
 ADV, ADVt = advected()
 if a.advect: print("advected inputs ready", ADV.shape, flush=True)
-N_IN = 8 + (3 if a.advect else 0) + (3 if a.clim else 0)
+N_IN = 8 + (3 if a.advect else 0) + (3 if a.clim else 0) + (6 if a.clim == 2 else 0)
 N_OUT = 6 if a.aux_reg > 0 else 3
 # fixed coordinate channels (CoordConv): standardised row and column index, the same for every sample, so the
 # network can learn location-dependent behaviour while each forecast reads only its three rain maps and its
@@ -139,7 +141,7 @@ class DS(torch.utils.data.Dataset):
         tfe = np.broadcast_to(self.tf[i][:, None, None], (3, H, W))
         parts = [x, row_c[None], col_c[None], tfe]
         if self.adv is not None: parts.append(np.log1p(np.maximum(self.adv[i], 0)) / 2.0)
-        if self.ch is not None: parts.append(CLIM[self.ch[i]])
+        if self.ch is not None: parts += clim_channels(self.ch[i])
         inp = np.concatenate(parts, 0).astype(np.float32)
         tgt = self.target(i) if self.y is not None else np.zeros((N_OUT, H, W), np.float32)
         if self.mixup > 0 and self.y is not None and i + 1 < len(self.X) and np.random.rand() < self.mixup:
@@ -147,7 +149,7 @@ class DS(torch.utils.data.Dataset):
             x2 = np.log1p(np.maximum(self.X[i + 1], 0)) / 2.0
             parts2 = [x2, row_c[None], col_c[None], np.broadcast_to(self.tf[i + 1][:, None, None], (3, H, W))]
             if self.adv is not None: parts2.append(np.log1p(np.maximum(self.adv[i + 1], 0)) / 2.0)
-            if self.ch is not None: parts2.append(CLIM[self.ch[i + 1]])
+            if self.ch is not None: parts2 += clim_channels(self.ch[i + 1])
             inp = lam * inp + (1 - lam) * np.concatenate(parts2, 0).astype(np.float32)
             tgt = lam * tgt + (1 - lam) * self.target(i + 1)
         if self.aug == 1:  # rotations and flips: break the geographic motion prior, kept for reference
@@ -189,9 +191,35 @@ def climatology(rows):
     freq = uniform_filter(wet / np.maximum(n, 1)[:, None, None], size=(1, 5, 5), mode="nearest")
     return ((freq - freq.mean()) / freq.std()).astype(np.float32)
 
+def transitions(rows):
+    """Storm start and persistence climatologies: per lead time, hour of day of the lead time and pixel, how often
+    rain > 1 mm/h follows where the pixel is dry at the forecast time (start) and where it already rains there
+    (persistence), over the given training rows. Counts are smoothed over +-1 hour and 5x5 pixels before dividing
+    (a pixel that is rarely wet has few persistence cases), then each kind is standardised.
+    Shape (3 leads, 2 kinds, 24, H, W). Like climatology(), validation runs count the training split only."""
+    from scipy.ndimage import uniform_filter
+    H, W = y.shape[-2:]; wet, n = np.zeros((3, 2, 24, H, W)), np.zeros((3, 2, 24, H, W))
+    for s in range(0, len(rows), 512):
+        r = rows[s:s + 512]; hrs = lead_hours(ts[r]); now = np.asarray(X[r, 2]) > 1.0; yb = np.asarray(y[r]) > 1.0
+        for k in range(3):
+            for j, state in enumerate((~now, now)):
+                np.add.at(wet[k, j], hrs[:, k], yb[:, k] & state); np.add.at(n[k, j], hrs[:, k], state)
+    wet, n = sum(np.roll(wet, d, 2) for d in (-1, 0, 1)), sum(np.roll(n, d, 2) for d in (-1, 0, 1))
+    box = lambda c: uniform_filter(c, size=(1, 1, 1, 5, 5), mode="nearest")
+    freq = box(wet) / np.maximum(box(n), 1e-6)
+    m, sd = freq.mean(axis=(0, 2, 3, 4), keepdims=True), freq.std(axis=(0, 2, 3, 4), keepdims=True)
+    return ((freq - m) / sd).astype(np.float32)
+
+def clim_channels(h):
+    """The climatology channels of one sample given the hours of day of its three lead times."""
+    out = [CLIM[h]]
+    if TRANS is not None: out += [TRANS[np.arange(3), 0, h], TRANS[np.arange(3), 1, h]]
+    return out
+
 CLIM = climatology(np.where(~val)[0]) if a.clim else None
+TRANS = transitions(np.where(~val)[0]) if a.clim == 2 else None
 CH, CHt = (lead_hours(ts), lead_hours(tst)) if a.clim else (None, None)
-if a.clim: print("climatology ready", CLIM.shape, flush=True)
+if a.clim: print("climatology ready", CLIM.shape, "" if TRANS is None else f"storm start and persistence {TRANS.shape}", flush=True)
 ds_tr = DS(Rows(X, tr_idx), Rows(y, tr_idx), tf_tr[tr_idx], a.aug, view(ADV, tr_idx), a.mixup, sub(CH, tr_idx))
 if a.wet_sampling:
     wet = np.array([(y[j] > 1.0).mean() for j in tr_idx])
@@ -280,7 +308,7 @@ def tune_thresholds(prob, obs):
     return best
 
 import os; os.makedirs(a.out, exist_ok=True)
-tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + ("adv_" if a.advect else "") + ("clim_" if a.clim else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
+tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + ("adv_" if a.advect else "") + ("clim_" if a.clim == 1 else "clim2_" if a.clim == 2 else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
 def masks(prob, thr):
     """Rain maps (0 or 10 mm/h) from one threshold per lead, in float32 to keep memory low."""
     return np.stack([prob[:, j] > thr[j] for j in range(3)], 1).astype(np.float32) * np.float32(10.0)
