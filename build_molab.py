@@ -38,10 +38,26 @@ RESULTS = f"cocofioren/{JOB['results']}"
 DATA, WORK, COMPACT = "/kaggle/input/competitions/hackathon-IndabaX-MDG-2026", "/kaggle/working", "/kaggle/compact"
 os.makedirs(DATA, exist_ok=True); os.makedirs(WORK, exist_ok=True)
 
+def exists(dataset):
+    r = subprocess.run(["kaggle", "datasets", "status", dataset], capture_output=True, text=True)
+    return "ready" in r.stdout.lower()
+
+def publish(folder, results, note):
+    """Compact a job's output folder with fetch_runs.py and publish it as a version of its results dataset."""
+    compact = folder + "-compact"; shutil.rmtree(compact, ignore_errors=True)
+    r = subprocess.run([sys.executable, f"{HERE}/fetch_runs.py", folder, compact], capture_output=True, text=True)
+    print(r.stdout + r.stderr, end="", flush=True)
+    if r.returncode != 0: return print("compaction failed, nothing uploaded", flush=True)
+    json.dump({"title": results.split("/")[1], "id": results, "licenses": [{"name": "CC0-1.0"}]}, open(f"{compact}/dataset-metadata.json", "w"))
+    cmd = ["version", "-p", compact, "-m", note] if exists(results) else ["create", "-p", compact]
+    rc = subprocess.run(["kaggle", "datasets"] + cmd + ["-q"]).returncode
+    print(f"upload ({note}):", "done" if rc == 0 else f"failed, exit code {rc}", sorted(os.listdir(compact)), flush=True)
+
 def stop_previous():
     """Start training again in the same molab session (after interrupting the cell) replaces the job still running
-    there: its worker, queue script and training processes are killed, and its files are moved out of
-    /kaggle/working, so this job's uploads hold only its own runs."""
+    there: its worker, queue script and training processes are killed, its files are moved out of /kaggle/working,
+    so this job's uploads hold only its own runs, and the runs it finished after its last upload are published to
+    its own results dataset (named in the job.json the worker leaves in /kaggle/working)."""
     keep = {os.getpid(), os.getppid()}
     for pid in filter(str.isdigit, os.listdir("/proc")):
         try: cmd = open(f"/proc/{pid}/cmdline", "rb").read().decode(errors="ignore")
@@ -53,7 +69,10 @@ def stop_previous():
         old = f"/kaggle/previous-{time.strftime('%Y%m%d-%H%M%S')}"
         shutil.move(WORK, old); os.makedirs(WORK)
         print("previous job's files moved to", old, flush=True)
+        if os.path.exists(f"{old}/job.json") and os.path.exists(f"{old}/session.json"):
+            publish(old, f"cocofioren/{json.load(open(f'{old}/job.json'))['results']}", "runs finished before a restart")
 stop_previous()
+shutil.copy(f"{HERE}/job.json", WORK)  # tells a later restart which results dataset this job's leftovers belong to
 subprocess.run(["nvidia-smi", "-L"])
 for f in ["train.npz", "test.npz"]:
     if not os.path.exists(f"{DATA}/{f}"):
@@ -62,23 +81,11 @@ for z in glob.glob(f"{DATA}/*.zip"):
     shutil.unpack_archive(z, DATA); os.remove(z)
 print("data:", sorted(os.listdir(DATA)), "job:", JOB, flush=True)
 
-def exists(dataset):
-    r = subprocess.run(["kaggle", "datasets", "status", dataset], capture_output=True, text=True)
-    return "ready" in r.stdout.lower()
-
 lock = threading.Lock()
 def upload(note):
     """Compact the kernel output with fetch_runs.py, then publish it as the results dataset (private)."""
     with lock:
-        if not os.path.exists(f"{WORK}/session.json"): return
-        shutil.rmtree(COMPACT, ignore_errors=True)
-        r = subprocess.run([sys.executable, f"{HERE}/fetch_runs.py", WORK, COMPACT], capture_output=True, text=True)
-        print(r.stdout + r.stderr, end="", flush=True)
-        if r.returncode != 0: return print("compaction failed, nothing uploaded", flush=True)
-        json.dump({"title": JOB["results"], "id": RESULTS, "licenses": [{"name": "CC0-1.0"}]}, open(f"{COMPACT}/dataset-metadata.json", "w"))
-        cmd = ["version", "-p", COMPACT, "-m", note] if exists(RESULTS) else ["create", "-p", COMPACT]
-        rc = subprocess.run(["kaggle", "datasets"] + cmd + ["-q"]).returncode
-        print(f"upload ({note}):", "done" if rc == 0 else f"failed, exit code {rc}", sorted(os.listdir(COMPACT)), flush=True)
+        if os.path.exists(f"{WORK}/session.json"): publish(WORK, RESULTS, note)
 
 def watch(p):
     """Upload after each finished run, at most every 30 minutes: a stopped session keeps the runs already done."""
