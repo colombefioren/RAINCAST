@@ -36,6 +36,15 @@ def fit_calibration(p, obs, bins=400):
 def calibrate(p, table):
     return table[np.clip(np.rint(p * 1000), 0, 1000).astype(np.int64)]
 
+def calibrate_wet(p, tables, edges):
+    """p: (N, H, W). Calibrates each sample with the table of its mean-probability quartile (dry to wet situations);
+    the quartile depends on the sample's own map only."""
+    bins = np.digitize(p.mean(axis=(1, 2)), edges)
+    out = np.empty(p.shape, np.float32)
+    for j, t in enumerate(tables):
+        if (bins == j).any(): out[bins == j] = calibrate(p[bins == j], np.asarray(t, np.float32))
+    return out
+
 def decode(p, mu, sweeps=6, init_thr=0.5, chunk=512):
     """p: calibrated probabilities (N, H, W). Returns a boolean mask (N, H, W)."""
     N, H, W = p.shape

@@ -12,6 +12,8 @@ p.add_argument("--dilate", type=int, default=0, help="1: also sweep a 3x3 dilati
 p.add_argument("--decode", type=int, default=0, help="1: also fit calibration and tune the expected-FSS decoder (src/fss_decode.py) per lead")
 p.add_argument("--mu", default="", help="comma-separated decoder mu per lead; skips the mu search (faster)")
 p.add_argument("--weights", default="", help="comma-separated blend weights, default equal")
+p.add_argument("--wet", type=int, default=0, help="1: with --decode, one calibration table per quartile of a sample's mean "
+               "probability (dry to wet situations) instead of one per lead")
 p.add_argument("probs", nargs="+")
 a = p.parse_args()
 
@@ -61,12 +63,20 @@ if a.decode:
     # calibration and mu are fitted on the whole validation season (in-sample); src/eval_decode.py gives the
     # honest out-of-sample estimate. mu is searched coarse (step 0.05) then fine (step 0.025) on every 2nd sample.
     import torch
-    from fss_decode import fit_calibration, calibrate, decode
+    from fss_decode import fit_calibration, calibrate, calibrate_wet, decode
+    wet_cfg = {"edges": [], "tables": []}
     torch.set_num_threads(os.cpu_count())
     tables, mus, dec = [], [], []
     for k in range(3):
         table = fit_calibration(PV[:, k], yv[:, k] > 1.0)
-        c_half, y_half = calibrate(PV[::2, k], table), yv[::2, k:k+1]
+        if a.wet:  # quartiles of each sample's mean probability; each sample is calibrated by its own quartile's table
+            edges = np.quantile(PV[:, k].mean(axis=(1, 2)), [0.25, 0.5, 0.75]); bins = np.digitize(PV[:, k].mean(axis=(1, 2)), edges)
+            wet_tables = [fit_calibration(PV[bins == j, k], yv[bins == j, k] > 1.0) for j in range(4)]
+            cal = lambda P, t=wet_tables, e=edges: calibrate_wet(P, t, e)
+            wet_cfg["edges"].append(edges.tolist()); wet_cfg["tables"].append([t.tolist() for t in wet_tables])
+        else:
+            cal = lambda P, t=table: calibrate(P, t)
+        c_half, y_half = cal(PV[::2, k]), yv[::2, k:k+1]
         if a.mu:
             mu = float(a.mu.split(",")[k])
         else:
@@ -75,10 +85,11 @@ if a.decode:
             m0 = max(tried, key=tried.get)
             for m in (m0 - 0.025, m0 + 0.025): tried[round(m, 3)] = sc(m)
             mu = max(tried, key=tried.get)
-        full = fss_pooled(decode(calibrate(PV[:, k], table), mu)[:, None] * 10.0, yv[:, k:k+1])[0]
+        full = fss_pooled(decode(cal(PV[:, k]), mu)[:, None] * 10.0, yv[:, k:k+1])[0]
         print(f"lead {k+1}: decoder mu {mu:.3f} fss {full:.4f} (threshold {best[k]:.4f})", flush=True)
         tables.append(table.tolist()); mus.append(float(mu)); dec.append(float(full))
     cfg["decode"] = {"mu": mus, "tables": tables}
+    if a.wet: cfg["decode"]["wet"] = wet_cfg
     cfg["val_fss_decoded"] = float(np.mean(dec)); cfg["per_lead_decoded"] = dec
     print("decoded validation FSS", round(cfg["val_fss_decoded"], 4))
 json.dump(cfg, open(a.out, "w"), indent=1)

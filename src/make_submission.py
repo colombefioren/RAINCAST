@@ -10,9 +10,12 @@ assert len(w) == len(probs), f"{len(probs)} probability files for {len(w)} blend
 P = sum(wi * load_prob(p) for wi, p in zip(w / w.sum(), probs)).astype(np.float32)  # (200,3,128,128), one file in memory at a time
 pred = np.stack([maximum_filter((P[:, k] > thr[k]).astype(np.float32), size=(1, dil[k], dil[k])) * 10.0 if dil[k] > 1 else (P[:, k] > thr[k]) * 10.0 for k in range(3)], 1).astype(np.float32)
 if "decode" in cfg:  # expected-FSS decoder instead of thresholds, see src/fss_decode.py
-    from fss_decode import calibrate, decode
-    pred = np.stack([decode(calibrate(P[:, k], np.array(cfg["decode"]["tables"][k], np.float32)), cfg["decode"]["mu"][k]) * 10.0
-                     for k in range(3)], 1).astype(np.float32)
+    from fss_decode import calibrate, calibrate_wet, decode
+    dec, wet = cfg["decode"], cfg["decode"].get("wet")
+    cal = (lambda k: calibrate_wet(P[:, k], wet["tables"][k], np.array(wet["edges"][k]))) if wet else \
+          (lambda k: calibrate(P[:, k], np.array(dec["tables"][k], np.float32)))
+    pred = np.stack([decode(cal(k), dec["mu"][k]) * 10.0 for k in range(3)], 1).astype(np.float32)
+    if wet: print("calibrated per dry-to-wet quartile")
     print("decoded with mu", cfg["decode"]["mu"])
 assert pred.shape == (200, 3, 128, 128) and np.isfinite(pred).all()
 flat = pred.transpose(0, 2, 3, 1).reshape(-1, 3)
