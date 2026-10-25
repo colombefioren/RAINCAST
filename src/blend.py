@@ -65,7 +65,7 @@ if a.decode:
     # calibration and mu are fitted on the whole validation season (in-sample); src/eval_decode.py gives the
     # honest out-of-sample estimate. mu is searched coarse (step 0.05) then fine (step 0.025) on every 2nd sample.
     import torch
-    from fss_decode import fit_calibration, calibrate, calibrate_wet, decode
+    from fss_decode import fit_calibration, calibrate, calibrate_wet, decode, decode_best
     wet_cfg, context = {"edges": [], "tables": []}, []
     if a.context:  # each validation sample's rain maps at the forecast time and one hour before, and its hour
         import context_calib
@@ -98,7 +98,7 @@ if a.decode:
             m0 = max(tried, key=tried.get)
             for m in (m0 - 0.025, m0 + 0.025): tried[round(m, 3)] = sc(m)
             mu = max(tried, key=tried.get)
-        full = fss_pooled(decode(cal(np.arange(len(PV))), mu)[:, None] * 10.0, yv[:, k:k+1])[0]
+        full = fss_pooled(decode_best(cal(np.arange(len(PV))), mu)[:, None] * 10.0, yv[:, k:k+1])[0]  # mu was searched with single-start decode()
         print(f"lead {k+1}: decoder mu {mu:.3f} fss {full:.4f} (threshold {best[k]:.4f})", flush=True)
         tables.append(table.tolist()); mus.append(float(mu)); dec.append(float(full))
     cfg["decode"] = {"mu": mus, "tables": tables}

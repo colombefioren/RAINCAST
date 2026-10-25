@@ -45,8 +45,9 @@ def calibrate_wet(p, tables, edges):
         if (bins == j).any(): out[bins == j] = calibrate(p[bins == j], np.asarray(t, np.float32))
     return out
 
-def decode(p, mu, sweeps=6, init_thr=0.5, chunk=512):
-    """p: calibrated probabilities (N, H, W). Returns a boolean mask (N, H, W)."""
+def decode(p, mu, sweeps=6, init_thr=0.5, chunk=512, init=None):
+    """p: calibrated probabilities (N, H, W). Returns a boolean mask (N, H, W). ICM starts from p > init_thr, or
+    from the boolean masks init (N, H, W) when given."""
     N, H, W = p.shape
     yy, xx = np.meshgrid(np.arange(H), np.arange(W), indexing="ij")
     classes = [torch.from_numpy((yy % 3 == i) & (xx % 3 == j))[None, None] for i in range(3) for j in range(3)]
@@ -55,7 +56,7 @@ def decode(p, mu, sweeps=6, init_thr=0.5, chunk=512):
     for s in range(0, N, chunk):
         pt = torch.from_numpy(np.ascontiguousarray(p[s:s + chunk], dtype=np.float32))[:, None]
         q = box(box(pt))
-        M = (pt > init_thr).float()
+        M = (pt > init_thr).float() if init is None else torch.from_numpy(init[s:s + chunk].astype(np.float32))[:, None]
         for _ in range(sweeps):
             for c in classes:
                 g = box(box(M)) - M * nb / 81  # neighbourhood sum without the pixel itself
@@ -63,3 +64,23 @@ def decode(p, mu, sweeps=6, init_thr=0.5, chunk=512):
                 M = torch.where(c, on, M)
         out[s:s + chunk] = M[:, 0].numpy() > 0.5
     return out
+
+def objective(M, p, mu, chunk=512):
+    """Per-sample value of the decoder's objective sum(M q) - mu sum(box(M)^2) for boolean masks M (N, H, W)."""
+    out = np.zeros(len(M))
+    for s in range(0, len(M), chunk):
+        Mt = torch.from_numpy(M[s:s + chunk].astype(np.float32))[:, None]
+        pt = torch.from_numpy(np.ascontiguousarray(p[s:s + chunk], dtype=np.float32))[:, None]
+        q = box(box(pt))
+        out[s:s + chunk] = ((Mt * q).sum((1, 2, 3)) - mu * (box(Mt) ** 2).sum((1, 2, 3))).numpy()
+    return out
+
+def decode_best(p, mu, inits=(0.5, 0.65), anneal=True, sweeps=6):
+    """decode() from several starts, keeping for each sample the mask with the highest objective: thresholds of p
+    at each of inits, and (anneal) ICM at 0.7 mu continued at mu. ICM finds local optima, and the objective tracks
+    the pooled FSS closely: on the validation season of blend32cw2 this gave +0.0003 / +0.0002 / +0.0001 per lead
+    over the single start at 0.5, for three times the decoding time."""
+    masks = [decode(p, mu, sweeps, thr) for thr in inits]
+    if anneal: masks.append(decode(p, mu, sweeps + 2, init=decode(p, 0.7 * mu, 4)))
+    J = np.stack([objective(M, p, mu) for M in masks])
+    return np.stack(masks)[J.argmax(0), np.arange(len(p))]
