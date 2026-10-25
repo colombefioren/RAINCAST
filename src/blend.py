@@ -14,6 +14,8 @@ p.add_argument("--mu", default="", help="comma-separated decoder mu per lead; sk
 p.add_argument("--weights", default="", help="comma-separated blend weights, default equal")
 p.add_argument("--wet", type=int, default=0, help="1: with --decode, one calibration table per quartile of a sample's mean "
                "probability (dry to wet situations) instead of one per lead")
+p.add_argument("--context", type=int, default=0, help="1: with --decode, refine the isotonic calibration with the "
+               "neighbourhood-aware logistic model of src/context_calib.py (fitted per lead on the validation season)")
 p.add_argument("probs", nargs="+")
 a = p.parse_args()
 
@@ -64,19 +66,30 @@ if a.decode:
     # honest out-of-sample estimate. mu is searched coarse (step 0.05) then fine (step 0.025) on every 2nd sample.
     import torch
     from fss_decode import fit_calibration, calibrate, calibrate_wet, decode
-    wet_cfg = {"edges": [], "tables": []}
+    wet_cfg, context = {"edges": [], "tables": []}, []
+    if a.context:  # each validation sample's rain maps at the forecast time and one hour before, and its hour
+        import context_calib
+        tr = np.load(f"{a.data}/train.npz"); ts = pd.to_datetime(tr["times"])
+        val = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")); Xv = tr["X"][val]
+        NOW, PREV, HRS = Xv[:, 2].copy(), Xv[:, 1].copy(), ts[val].hour.values; del Xv, tr
     torch.set_num_threads(os.cpu_count())
     tables, mus, dec = [], [], []
     for k in range(3):
         table = fit_calibration(PV[:, k], yv[:, k] > 1.0)
-        if a.wet:  # quartiles of each sample's mean probability; each sample is calibrated by its own quartile's table
+        # cal(i): calibrated probabilities of the validation samples i at lead k
+        if a.context:
+            hrs = (HRS + k + 1) % 24
+            ctx = context_calib.fit(PV[:, k], yv[:, k] > 1.0, table, NOW, PREV, hrs)
+            cal = lambda i, t=table, m=ctx, h=hrs, k=k: context_calib.apply(PV[i, k], t, m, NOW[i], PREV[i], h[i])
+            context.append(ctx)
+        elif a.wet:  # quartiles of each sample's mean probability; each sample is calibrated by its own quartile's table
             edges = np.quantile(PV[:, k].mean(axis=(1, 2)), [0.25, 0.5, 0.75]); bins = np.digitize(PV[:, k].mean(axis=(1, 2)), edges)
             wet_tables = [fit_calibration(PV[bins == j, k], yv[bins == j, k] > 1.0) for j in range(4)]
-            cal = lambda P, t=wet_tables, e=edges: calibrate_wet(P, t, e)
+            cal = lambda i, t=wet_tables, e=edges, k=k: calibrate_wet(PV[i, k], t, e)
             wet_cfg["edges"].append(edges.tolist()); wet_cfg["tables"].append([t.tolist() for t in wet_tables])
         else:
-            cal = lambda P, t=table: calibrate(P, t)
-        c_half, y_half = cal(PV[::2, k]), yv[::2, k:k+1]
+            cal = lambda i, t=table, k=k: calibrate(PV[i, k], t)
+        c_half, y_half = cal(np.arange(0, len(PV), 2)), yv[::2, k:k+1]
         if a.mu:
             mu = float(a.mu.split(",")[k])
         else:
@@ -85,11 +98,12 @@ if a.decode:
             m0 = max(tried, key=tried.get)
             for m in (m0 - 0.025, m0 + 0.025): tried[round(m, 3)] = sc(m)
             mu = max(tried, key=tried.get)
-        full = fss_pooled(decode(cal(PV[:, k]), mu)[:, None] * 10.0, yv[:, k:k+1])[0]
+        full = fss_pooled(decode(cal(np.arange(len(PV))), mu)[:, None] * 10.0, yv[:, k:k+1])[0]
         print(f"lead {k+1}: decoder mu {mu:.3f} fss {full:.4f} (threshold {best[k]:.4f})", flush=True)
         tables.append(table.tolist()); mus.append(float(mu)); dec.append(float(full))
     cfg["decode"] = {"mu": mus, "tables": tables}
     if a.wet: cfg["decode"]["wet"] = wet_cfg
+    if a.context: cfg["decode"]["context"] = context; cfg["data"] = a.data  # make_submission.py reads test.npz there
     cfg["val_fss_decoded"] = float(np.mean(dec)); cfg["per_lead_decoded"] = dec
     print("decoded validation FSS", round(cfg["val_fss_decoded"], 4))
 json.dump(cfg, open(a.out, "w"), indent=1)
