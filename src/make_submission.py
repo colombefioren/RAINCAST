@@ -11,11 +11,19 @@ P = sum(wi * load_prob(p) for wi, p in zip(w / w.sum(), probs)).astype(np.float3
 pred = np.stack([maximum_filter((P[:, k] > thr[k]).astype(np.float32), size=(1, dil[k], dil[k])) * 10.0 if dil[k] > 1 else (P[:, k] > thr[k]) * 10.0 for k in range(3)], 1).astype(np.float32)
 if "decode" in cfg:  # expected-FSS decoder instead of thresholds, see src/fss_decode.py
     from fss_decode import calibrate, calibrate_wet, decode
-    dec, wet = cfg["decode"], cfg["decode"].get("wet")
-    cal = (lambda k: calibrate_wet(P[:, k], wet["tables"][k], np.array(wet["edges"][k]))) if wet else \
-          (lambda k: calibrate(P[:, k], np.array(dec["tables"][k], np.float32)))
+    dec, wet, ctx = cfg["decode"], cfg["decode"].get("wet"), cfg["decode"].get("context")
+    if ctx:  # neighbourhood-aware calibration (src/context_calib.py): reads each test sample's own rain maps and hour
+        import context_calib
+        te = np.load(f"{cfg.get('data', '../data')}/test.npz"); Xt = te["X"]; hrs = pd.to_datetime(te["times"]).hour.values
+        assert len(Xt) == len(P)
+        cal = lambda k: context_calib.apply(P[:, k], np.array(dec["tables"][k], np.float32), ctx[k], Xt[:, 2], Xt[:, 1], (hrs + k + 1) % 24)
+    elif wet:
+        cal = lambda k: calibrate_wet(P[:, k], wet["tables"][k], np.array(wet["edges"][k]))
+    else:
+        cal = lambda k: calibrate(P[:, k], np.array(dec["tables"][k], np.float32))
     pred = np.stack([decode(cal(k), dec["mu"][k]) * 10.0 for k in range(3)], 1).astype(np.float32)
-    if wet: print("calibrated per dry-to-wet quartile")
+    if ctx: print("calibrated with the neighbourhood-aware model")
+    if wet and not ctx: print("calibrated per dry-to-wet quartile")
     print("decoded with mu", cfg["decode"]["mu"])
 assert pred.shape == (200, 3, 128, 128) and np.isfinite(pred).all()
 flat = pred.transpose(0, 2, 3, 1).reshape(-1, 3)
