@@ -10,7 +10,8 @@ It publishes the private Kaggle dataset cocofioren/indabax-molab-jobs (the kerne
 molab_worker.py and src/fetch_runs.py) and writes the molab notebook molab/indabax-molab-worker.py. In molab:
 create a notebook with its three cells, choose the GPU (resources menu > GPUs > RTX Pro 6000, Save and
 restart), paste the Kaggle API token into the password box and click Start training. The token stays in the
-session: it is never saved in the notebook. molab_worker.py then
+session: it is never saved in the notebook. The notebook downloads the four files one by one: since 25 October
+Kaggle answers 404 to whole-archive downloads of most new versions of this private dataset. molab_worker.py then
 - downloads train.npz and test.npz to /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 (molab runs
   notebooks as root, so the Kaggle paths of the kernel script work unchanged);
 - runs job.py, relaying its log without the per-iteration lines;
@@ -30,12 +31,29 @@ JOBS = "cocofioren/indabax-molab-jobs"
 KAGGLE = os.environ.get("KAGGLE", "kaggle")
 
 WORKER = r'''"""molab side of build_molab.py: download the data, run job.py, upload compact results after each run."""
-import glob, json, os, re, shutil, subprocess, sys, threading, time
+import glob, json, os, re, shutil, signal, subprocess, sys, threading, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 JOB = json.load(open(f"{HERE}/job.json"))
 RESULTS = f"cocofioren/{JOB['results']}"
 DATA, WORK, COMPACT = "/kaggle/input/competitions/hackathon-IndabaX-MDG-2026", "/kaggle/working", "/kaggle/compact"
 os.makedirs(DATA, exist_ok=True); os.makedirs(WORK, exist_ok=True)
+
+def stop_previous():
+    """Start training again in the same molab session (after interrupting the cell) replaces the job still running
+    there: its worker, queue script and training processes are killed, and its files are moved out of
+    /kaggle/working, so this job's uploads hold only its own runs."""
+    keep = {os.getpid(), os.getppid()}
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        try: cmd = open(f"/proc/{pid}/cmdline", "rb").read().decode(errors="ignore")
+        except OSError: continue
+        if int(pid) not in keep and any(k in cmd for k in ("molab_worker.py", "/kaggle/jobs/job.py", "/kaggle/tmp/train.py")):
+            try: os.kill(int(pid), signal.SIGKILL); print("stopped process", pid, "of the previous job", flush=True)
+            except OSError: pass
+    if os.listdir(WORK):
+        old = f"/kaggle/previous-{time.strftime('%Y%m%d-%H%M%S')}"
+        shutil.move(WORK, old); os.makedirs(WORK)
+        print("previous job's files moved to", old, flush=True)
+stop_previous()
 subprocess.run(["nvidia-smi", "-L"])
 for f in ["train.npz", "test.npz"]:
     if not os.path.exists(f"{DATA}/{f}"):
@@ -110,7 +128,7 @@ def _(mo, start, token):
     kaggle_dir.mkdir(exist_ok=True)
     (kaggle_dir / "access_token").write_text(token.value.strip())
     os.chmod(kaggle_dir / "access_token", 0o600)
-    cmd = "python -m pip -q install -U kaggle && kaggle datasets download -d cocofioren/indabax-molab-jobs -p /kaggle/jobs --unzip -o -q && python -u /kaggle/jobs/molab_worker.py"
+    cmd = "python -m pip -q install -U kaggle && mkdir -p /kaggle/jobs && for f in job.py job.json molab_worker.py fetch_runs.py; do kaggle datasets download -d cocofioren/indabax-molab-jobs -f $f -p /kaggle/jobs -o -q || exit 1; done && python -u /kaggle/jobs/molab_worker.py"
     proc = subprocess.Popen(cmd, shell=True, env=dict(os.environ, KAGGLE_API_TOKEN=token.value.strip()), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     for line in proc.stdout:
         print(line, end="", flush=True)
