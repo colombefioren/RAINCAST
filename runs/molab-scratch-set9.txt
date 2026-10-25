@@ -1,8 +1,17 @@
-# Ninth molab session (26 October): more out-of-fold frequency climatology runs (--clim 1 --clim_oof 1), the recipe
-# of the best single runs so far (s1602 0.7138, s1603 0.7127, s1601 0.7117: about +0.001 per run over the leaky
-# climatology runs), with the full-data twin of each, as blend members for the final ensemble. Validation run and
-# twin alternate so that a cut session leaves complete pairs. Two runs at a time.
+# Ninth molab session (25 to 26 October): six single-model tests first, then more out-of-fold frequency climatology
+# runs (--clim 1 --clim_oof 1), the recipe of the best single runs so far (s1602 0.7138, s1603 0.7127, s1601 0.7117:
+# about +0.001 per run over the leaky climatology runs), with the full-data twin of each, as blend members for the
+# final ensemble. The tests, validation runs without twins so that the next session trains twins of the winners
+# only: 20 epochs with a last-8 average (s1611, s1612), a resnet50 encoder (s1621, s1622) and the neighbourhood
+# climatology (--clim 3, s1805, s1806), all out of fold. Validation run and twin then alternate so that a cut
+# session leaves complete pairs. Two runs at a time.
 base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+--arch UnetPlusPlus --encoder resnet34 --epochs 20 --keep_epochs 8 --clim 1 --clim_oof 1 --seed 1611
+--arch UnetPlusPlus --encoder resnet34 --epochs 20 --keep_epochs 8 --clim 1 --clim_oof 1 --seed 1612
+--arch UnetPlusPlus --encoder resnet50 --epochs 14 --clim 1 --clim_oof 1 --seed 1621
+--arch UnetPlusPlus --encoder resnet50 --epochs 14 --clim 1 --clim_oof 1 --seed 1622
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1805
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1806
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1703 --full
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1604
 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1704 --full
