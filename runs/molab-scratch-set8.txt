@@ -1,0 +1,26 @@
+# Eighth molab session (25 October): cross-season fold models. Plain 14-epoch U-Net++ runs that hold out one of
+# the three other training seasons (--val_season 2019, 2020 or 2021) instead of December 2022 to March 2023, six
+# seeds per season, seasons interleaved so that a cut session still covers all three. Their validation
+# probabilities are out of fold for those seasons, which gives (1) calibration and decoder settings fitted on four
+# seasons instead of one, and (2) about 8,000 more samples of honest ensemble probabilities to train a second-stage
+# model on (the context calibration gained +0.001 on held-out days of the single validation season). The test side
+# stays the full-data twins. Two runs at a time, like the seventh session.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2019 --seed 2001
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2020 --seed 2101
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2021 --seed 2201
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2019 --seed 2002
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2020 --seed 2102
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2021 --seed 2202
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2019 --seed 2003
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2020 --seed 2103
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2021 --seed 2203
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2019 --seed 2004
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2020 --seed 2104
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2021 --seed 2204
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2019 --seed 2005
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2020 --seed 2105
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2021 --seed 2205
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2019 --seed 2006
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2020 --seed 2106
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --val_season 2021 --seed 2206
