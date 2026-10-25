@@ -30,12 +30,29 @@ JOBS = "cocofioren/indabax-molab-jobs"
 KAGGLE = os.environ.get("KAGGLE", "kaggle")
 
 WORKER = r'''"""molab side of build_molab.py: download the data, run job.py, upload compact results after each run."""
-import glob, json, os, re, shutil, subprocess, sys, threading, time
+import glob, json, os, re, shutil, signal, subprocess, sys, threading, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 JOB = json.load(open(f"{HERE}/job.json"))
 RESULTS = f"cocofioren/{JOB['results']}"
 DATA, WORK, COMPACT = "/kaggle/input/competitions/hackathon-IndabaX-MDG-2026", "/kaggle/working", "/kaggle/compact"
 os.makedirs(DATA, exist_ok=True); os.makedirs(WORK, exist_ok=True)
+
+def stop_previous():
+    """Start training again in the same molab session (after interrupting the cell) replaces the job still running
+    there: its worker, queue script and training processes are killed, and its files are moved out of
+    /kaggle/working, so this job's uploads hold only its own runs."""
+    keep = {os.getpid(), os.getppid()}
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        try: cmd = open(f"/proc/{pid}/cmdline", "rb").read().decode(errors="ignore")
+        except OSError: continue
+        if int(pid) not in keep and any(k in cmd for k in ("molab_worker.py", "/kaggle/jobs/job.py", "/kaggle/tmp/train.py")):
+            try: os.kill(int(pid), signal.SIGKILL); print("stopped process", pid, "of the previous job", flush=True)
+            except OSError: pass
+    if os.listdir(WORK):
+        old = f"/kaggle/previous-{time.strftime('%Y%m%d-%H%M%S')}"
+        shutil.move(WORK, old); os.makedirs(WORK)
+        print("previous job's files moved to", old, flush=True)
+stop_previous()
 subprocess.run(["nvidia-smi", "-L"])
 for f in ["train.npz", "test.npz"]:
     if not os.path.exists(f"{DATA}/{f}"):
