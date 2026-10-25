@@ -1,0 +1,37 @@
+# Seventh molab session (25 October): U-Net++ climatology runs whose training samples read out-of-fold tables
+# (--clim_oof 1: counted without the sample's own season, as the validation and test samples' tables are). The
+# first storm start run of the sixth session (s1402) scored 0.7065 against 0.7111 to 0.7122 for the frequency
+# climatology runs: its per-pixel persistence tables count few storms, so on the training samples they carry the
+# samples' own outcomes, and the model learns to trust them more than they deserve on a new season.
+# Pairs of a neighbourhood climatology run (--clim 3, which includes the storm start and persistence channels) and
+# a frequency climatology run (--clim 1), validation runs first (s1801 and s1601), then their full-data twins
+# (s1901 and s1701), and so on. Two runs at a time, like the sixth session.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1801
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1601
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1901 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1701 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1802
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1602
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1902 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1702 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1803
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1603
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1903 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1703 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1804
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1604
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1904 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1704 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1805
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1605
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1905 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1705 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1806
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1606
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1906 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1706 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1807
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1907 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1808
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 3 --clim_oof 1 --seed 1908 --full
