@@ -49,6 +49,9 @@ p.add_argument("--clim", type=int, default=0, help="1: add 3 climatology channel
                "at the forecast time, per lead time and its hour of day); 3: also 3 channels that look up, for each pixel, how often "
                "rain followed at each lead time when its 9x9 neighbourhood held as much rain as the sample's current map "
                "holds there (none, up to 15%, more)")
+p.add_argument("--clim_oof", type=int, default=0, help="1: with --clim, each training sample reads climatologies counted "
+               "without its own season (out of fold), as validation and test samples do; otherwise the tables count the "
+               "sample's own target and the model learns to trust them more than they deserve on a new season")
 p.add_argument("--xla", type=int, default=0, help="1: train on one TPU chip through PyTorch/XLA (Kaggle TPU v5e-8); "
                "--amp 1 then means bfloat16 autocast, which needs no loss scaling")
 a = p.parse_args()
@@ -179,9 +182,26 @@ def lead_hours(t):
     """Hour of day of the three lead times (+1h, +2h, +3h) of each sample: the rows of CLIM it reads."""
     return ((t.hour.values[:, None] + np.arange(1, 4)) % 24).astype(np.int64)
 
+def season_of(t):
+    """Rain season of each time: December to March, named by the year of its December (January 2020 is 2019)."""
+    return (t.year - (t.month < 7)).values
+
+def finished(counts, rows, axis=None):
+    """Tables of a climatology over the given training rows: the table of all rows first and, with --clim_oof, one
+    per training season counted without that season, all standardised with the mean and std of the first table
+    (per kind when axis is given). counts(rows) returns (wet, n, finish); counts add up, so a season is left out by
+    subtracting its own counts. Shape (1 + seasons, ...)."""
+    wet, n, finish = counts(rows)
+    out = [finish(wet, n)]
+    for s in (SEASONS if a.clim_oof else []):
+        w, m, _ = counts(rows[SEASON[rows] == s])
+        out.append(finish(wet - w, n - m))
+    m, sd = out[0].mean(axis=axis, keepdims=True), out[0].std(axis=axis, keepdims=True)
+    return np.stack([(t - m) / sd for t in out]).astype(np.float32)
+
 def climatology(rows):
     """Frequency of rain > 1 mm/h per hour of day and pixel over the given training rows (their three target
-    maps, each at its own hour), smoothed over +-1 hour and 5x5 pixels, then standardised. Validation runs count
+    maps, each at its own hour), smoothed over +-1 hour and 5x5 pixels (see finished()). Validation runs count
     the training split only; full-data runs count every row, like their training."""
     from scipy.ndimage import uniform_filter
     H, W = y.shape[-2:]; wet, n = np.zeros((24, H, W)), np.zeros(24)
@@ -189,15 +209,16 @@ def climatology(rows):
         r = rows[s:s + 512]; hrs = lead_hours(ts[r]); yb = np.asarray(y[r]) > 1.0
         for k in range(3):
             np.add.at(wet, hrs[:, k], yb[:, k]); np.add.at(n, hrs[:, k], 1)
-    wet, n = sum(np.roll(wet, d, 0) for d in (-1, 0, 1)), sum(np.roll(n, d) for d in (-1, 0, 1))
-    freq = uniform_filter(wet / np.maximum(n, 1)[:, None, None], size=(1, 5, 5), mode="nearest")
-    return ((freq - freq.mean()) / freq.std()).astype(np.float32)
+    def finish(wet, n):
+        wet, n = sum(np.roll(wet, d, 0) for d in (-1, 0, 1)), sum(np.roll(n, d) for d in (-1, 0, 1))
+        return uniform_filter(wet / np.maximum(n, 1)[:, None, None], size=(1, 5, 5), mode="nearest")
+    return wet, n, finish
 
 def transitions(rows):
     """Storm start and persistence climatologies: per lead time, hour of day of the lead time and pixel, how often
     rain > 1 mm/h follows where the pixel is dry at the forecast time (start) and where it already rains there
     (persistence), over the given training rows. Counts are smoothed over +-1 hour and 5x5 pixels before dividing
-    (a pixel that is rarely wet has few persistence cases), then each kind is standardised.
+    (a pixel that is rarely wet has few persistence cases); each kind is standardised on its own (see finished()).
     Shape (3 leads, 2 kinds, 24, H, W). Like climatology(), validation runs count the training split only."""
     from scipy.ndimage import uniform_filter
     H, W = y.shape[-2:]; wet, n = np.zeros((3, 2, 24, H, W)), np.zeros((3, 2, 24, H, W))
@@ -206,11 +227,11 @@ def transitions(rows):
         for k in range(3):
             for j, state in enumerate((~now, now)):
                 np.add.at(wet[k, j], hrs[:, k], yb[:, k] & state); np.add.at(n[k, j], hrs[:, k], state)
-    wet, n = sum(np.roll(wet, d, 2) for d in (-1, 0, 1)), sum(np.roll(n, d, 2) for d in (-1, 0, 1))
-    box = lambda c: uniform_filter(c, size=(1, 1, 1, 5, 5), mode="nearest")
-    freq = box(wet) / np.maximum(box(n), 1e-6)
-    m, sd = freq.mean(axis=(0, 2, 3, 4), keepdims=True), freq.std(axis=(0, 2, 3, 4), keepdims=True)
-    return ((freq - m) / sd).astype(np.float32)
+    def finish(wet, n):
+        wet, n = sum(np.roll(wet, d, 2) for d in (-1, 0, 1)), sum(np.roll(n, d, 2) for d in (-1, 0, 1))
+        box = lambda c: uniform_filter(c, size=(1, 1, 1, 5, 5), mode="nearest")
+        return box(wet) / np.maximum(box(n), 1e-6)
+    return wet, n, finish
 
 NB_EDGES = [1e-6, 0.15]  # rain share of the 9x9 neighbourhood at the forecast time: none, up to 15%, more
 
@@ -222,7 +243,7 @@ def neighbourhood_bins(now):
 def conditioned(rows):
     """Per lead time, neighbourhood bin, hour of day of the lead time and pixel: how often rain > 1 mm/h followed
     when the pixel's 9x9 neighbourhood held that much rain at the forecast time, over the given training rows; counts
-    smoothed over +-1 hour and 5x5 pixels before dividing, standardised. Shape (3 leads, 3 bins, 24, H, W)."""
+    smoothed over +-1 hour and 5x5 pixels before dividing (see finished()). Shape (3 leads, 3 bins, 24, H, W)."""
     from scipy.ndimage import uniform_filter
     H, W = y.shape[-2:]; wet, n = np.zeros((3, 3, 24, H, W)), np.zeros((3, 3, 24, H, W))
     for s in range(0, len(rows), 256):
@@ -231,25 +252,31 @@ def conditioned(rows):
         for k in range(3):
             for b in range(3):
                 np.add.at(wet[k, b], hrs[:, k], yb[:, k] & (nb == b)); np.add.at(n[k, b], hrs[:, k], nb == b)
-    wet, n = sum(np.roll(wet, d, 2) for d in (-1, 0, 1)), sum(np.roll(n, d, 2) for d in (-1, 0, 1))
-    box = lambda c: uniform_filter(c, size=(1, 1, 1, 5, 5), mode="nearest")
-    freq = box(wet) / np.maximum(box(n), 1e-6)
-    return ((freq - freq.mean()) / freq.std()).astype(np.float32)
+    def finish(wet, n):
+        wet, n = sum(np.roll(wet, d, 2) for d in (-1, 0, 1)), sum(np.roll(n, d, 2) for d in (-1, 0, 1))
+        box = lambda c: uniform_filter(c, size=(1, 1, 1, 5, 5), mode="nearest")
+        return box(wet) / np.maximum(box(n), 1e-6)
+    return wet, n, finish
 
-def clim_channels(h, now):
-    """The climatology channels of one sample given the hours of day of its three lead times and, for --clim 3, its
-    rain map at the forecast time (the sample's own input: no other sample is read)."""
-    out = [CLIM[h]]
-    if TRANS is not None: out += [TRANS[np.arange(3), 0, h], TRANS[np.arange(3), 1, h]]
+def clim_channels(hf, now):
+    """The climatology channels of one sample given the hours of day of its three lead times plus the table it reads
+    (hf, see FOLD) and, for --clim 3, its rain map at the forecast time (the sample's own input: no other sample is read)."""
+    h, f = hf[:3], hf[3]
+    out = [CLIM[f][h]]
+    if TRANS is not None: out += [TRANS[f][np.arange(3), 0, h], TRANS[f][np.arange(3), 1, h]]
     if COND is not None:
         nb = neighbourhood_bins(now); r, c = np.indices(nb.shape)
-        out.append(np.stack([COND[k, nb, h[k], r, c] for k in range(3)]))
+        out.append(np.stack([COND[f][k, nb, h[k], r, c] for k in range(3)]))
     return out
 
-CLIM = climatology(np.where(~val)[0]) if a.clim else None
-TRANS = transitions(np.where(~val)[0]) if a.clim >= 2 else None
-COND = conditioned(np.where(~val)[0]) if a.clim == 3 else None
-CH, CHt = (lead_hours(ts), lead_hours(tst)) if a.clim else (None, None)
+SEASON = season_of(ts); train_rows = np.where(~val)[0]; SEASONS = np.unique(SEASON[train_rows])
+CLIM = finished(climatology, train_rows) if a.clim else None
+TRANS = finished(transitions, train_rows, axis=(0, 2, 3, 4)) if a.clim >= 2 else None
+COND = finished(conditioned, train_rows) if a.clim == 3 else None
+# table each sample reads: 0 (all training rows) for validation and test samples, and for training samples
+# without --clim_oof; with it, 1 + the position of the sample's own season in SEASONS (its out-of-fold table)
+FOLD = np.where(val, 0, 1 + np.searchsorted(SEASONS, SEASON)) if a.clim_oof else np.zeros(len(ts), np.int64)
+CH, CHt = (np.c_[lead_hours(ts), FOLD], np.c_[lead_hours(tst), np.zeros(len(tst), np.int64)]) if a.clim else (None, None)
 if a.clim: print("climatology ready", CLIM.shape, "" if TRANS is None else f"storm start and persistence {TRANS.shape}", "" if COND is None else f"neighbourhood {COND.shape}", flush=True)
 ds_tr = DS(Rows(X, tr_idx), Rows(y, tr_idx), tf_tr[tr_idx], a.aug, view(ADV, tr_idx), a.mixup, sub(CH, tr_idx))
 if a.wet_sampling:
@@ -339,7 +366,7 @@ def tune_thresholds(prob, obs):
     return best
 
 import os; os.makedirs(a.out, exist_ok=True)
-tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + ("adv_" if a.advect else "") + ("clim_" if a.clim == 1 else f"clim{a.clim}_" if a.clim else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
+tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + ("adv_" if a.advect else "") + ("clim_" if a.clim == 1 else f"clim{a.clim}_" if a.clim else "") + ("oof_" if a.clim and a.clim_oof else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
 def masks(prob, thr):
     """Rain maps (0 or 10 mm/h) from one threshold per lead, in float32 to keep memory low."""
     return np.stack([prob[:, j] > thr[j] for j in range(3)], 1).astype(np.float32) * np.float32(10.0)
