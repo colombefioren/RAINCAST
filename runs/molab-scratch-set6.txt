@@ -1,0 +1,34 @@
+# Sixth molab session (25 October): U-Net++ runs with the storm start and persistence climatology (--clim 2: the
+# --clim 1 frequency channels plus, per lead time and its hour of day, how often rain follows where a pixel is dry
+# or already wet at the forecast time). A pixel-sample logistic model on the training split gained about 1% in
+# Brier score on the validation season from these maps over the frequency climatology, more than the frequency
+# climatology itself gained there, and the frequency climatology was the only input that added to the blend.
+# Validation runs first (s1401, s1402), then their full-data twins (s1501, s1502), then pairs s1403 to s1412 with
+# twins s1503 to s1512. Two runs at a time (--runs-per-gpu 2) instead of three: the fifth session's sandbox was
+# reclaimed twice, both times as a validation run finished while new runs started, which points to memory peaks
+# in the 32 GB sandbox; two runs give about the same throughput on the GPU.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1401
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1402
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1501 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1502 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1403
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1503 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1404
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1504 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1405
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1505 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1406
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1506 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1407
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1507 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1408
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1508 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1409
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1509 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1410
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1510 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1411
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1511 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1412
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 2 --seed 1512 --full
