@@ -27,7 +27,8 @@ a = p.parse_args()
 torch.set_num_threads(os.cpu_count())
 seasons = [int(s) for s in a.seasons.split(",")]; MU = [float(m) for m in a.mu.split(",")]
 tr = np.load(f"{a.data}/train.npz"); ts = pd.to_datetime(tr["times"])
-X, Y = tr["X"], tr["y"]  # read season by season below
+X = tr["X"][:, 1:3].astype(np.float16)  # rain one hour before and at the forecast time, half the size
+Y = tr["y"] > 1.0; del tr  # the whole arrays would hold 4 GB next to the per-season blends
 
 def season_rows(s): return np.where(np.asarray((ts >= f"{s}-12-01") & (ts < f"{s + 1}-04-01")))[0]
 
@@ -47,16 +48,17 @@ for s in seasons:
         assert len(pr) == len(rows), f"{f}: {len(pr)} maps for {len(rows)} samples of the {s} season"
         PV = wi * pr if PV is None else PV + wi * pr
     Xs = X[rows]
-    S[s] = dict(P=PV.astype(np.float16), y=Y[rows] > 1.0, now=Xs[:, 2].copy(), prev=Xs[:, 1].copy(), hours=ts[rows].hour.values)
+    S[s] = dict(P=PV.astype(np.float16), y=Y[rows], now=Xs[:, 1].copy(), prev=Xs[:, 0].copy(), hours=ts[rows].hour.values)
     print(f"season {s}: {len(rows)} samples, {len(files)} members", flush=True)
     del Xs
+del X, Y
 
 def fit_lead(train, k):
     """Isotonic table and context model of lead k fitted on the given seasons."""
     P = np.concatenate([S[s]["P"][:, k].astype(np.float32) for s in train]); o = np.concatenate([S[s]["y"][:, k] for s in train])
     table = fit_calibration(P, o)
     ctx = context_calib.fit(P, o, table, np.concatenate([S[s]["now"] for s in train]), np.concatenate([S[s]["prev"] for s in train]),
-                            np.concatenate([(S[s]["hours"] + k + 1) % 24 for s in train]))
+                            np.concatenate([(S[s]["hours"] + k + 1) % 24 for s in train]), rate=1.0 / len(train))
     return table, ctx
 
 def score(s, k, table, ctx=None):

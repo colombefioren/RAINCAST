@@ -27,6 +27,7 @@ def features(c, P, now, prev, hours):
     """c: calibrated probabilities, P: blend probabilities, now / prev: rain maps (mm/h) at the forecast time and
     one hour before, all (n, H, W); hours: (n,) hour of day of the lead time. Returns (n*H*W, NF) float32."""
     ang = 2 * np.pi * np.asarray(hours, np.float32) / 24.0
+    now, prev = np.asarray(now, np.float32), np.asarray(prev, np.float32)  # the callers may hold them as float16
     per_sample = lambda v: np.broadcast_to(np.asarray(v, np.float32)[:, None, None], c.shape)
     f = [logit(c), logit(uniform_filter(P, size=(1, 3, 3), mode="nearest")), logit(uniform_filter(P, size=(1, 9, 9), mode="nearest")),
          logit(uniform_filter(P, size=(1, 25, 25), mode="nearest")), logit(maximum_filter(P, size=(1, 3, 3), mode="nearest")),
@@ -38,15 +39,16 @@ def expand(Z):
     """Features plus all their pairwise products."""
     return torch.cat([Z, (Z[:, :, None] * Z[:, None, :]).flatten(1)], 1)
 
-def fit(P, obs, table, now, prev, hours, chunk=100, seed=0):
+def fit(P, obs, table, now, prev, hours, chunk=100, seed=0, rate=1.0):
     """P: (n, H, W) blend probabilities of one lead time, obs: (n, H, W) booleans (rain > 1 mm/h), table: its
-    isotonic table. Returns the model as a dict of lists (JSON-ready)."""
+    isotonic table; rate scales both pixel sampling rates (1 / number of seasons keeps a multi-season fit the size
+    of a one-season fit). Returns the model as a dict of lists (JSON-ready)."""
     rng = np.random.default_rng(seed)
     Xs, Ys, Ws = [], [], []
     for s in range(0, len(P), chunk):
         r = slice(s, s + chunk); c = calibrate(P[r], table)
         F = features(c, P[r], now[r], prev[r], hours[r]); o = obs[r].reshape(-1); cc = c.reshape(-1)
-        keep = np.where(cc > 0.01, rng.random(len(cc)) < 0.15, rng.random(len(cc)) < 0.0075)
+        keep = np.where(cc > 0.01, rng.random(len(cc)) < 0.15 * rate, rng.random(len(cc)) < 0.0075 * rate)
         Xs.append(F[keep]); Ys.append(o[keep]); Ws.append(np.where(cc[keep] > 0.01, 1.0, 20.0))
     X = torch.from_numpy(np.concatenate(Xs)); Y = torch.from_numpy(np.concatenate(Ys).astype(np.float32))
     W = torch.from_numpy(np.concatenate(Ws).astype(np.float32)); del Xs, Ys, Ws
