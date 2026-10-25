@@ -1,0 +1,20 @@
+# Ninth molab session (26 October): more out-of-fold frequency climatology runs (--clim 1 --clim_oof 1), the recipe
+# of the best single runs so far (s1602 0.7138, s1603 0.7127, s1601 0.7117: about +0.001 per run over the leaky
+# climatology runs), with the full-data twin of each, as blend members for the final ensemble. Validation run and
+# twin alternate so that a cut session leaves complete pairs. Two runs at a time.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1703 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1604
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1704 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1605
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1705 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1606
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1706 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1607
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1707 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1608
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1708 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1609
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1709 --full
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1610
+--arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --seed 1710 --full
