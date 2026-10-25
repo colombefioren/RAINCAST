@@ -26,7 +26,7 @@ def _(mo, start, token):
     kaggle_dir.mkdir(exist_ok=True)
     (kaggle_dir / "access_token").write_text(token.value.strip())
     os.chmod(kaggle_dir / "access_token", 0o600)
-    cmd = "python -m pip -q install -U kaggle && kaggle datasets download -d cocofioren/indabax-molab-jobs -p /kaggle/jobs --unzip -o -q && python -u /kaggle/jobs/molab_worker.py"
+    cmd = "python -m pip -q install -U kaggle && mkdir -p /kaggle/jobs && for f in job.py job.json molab_worker.py fetch_runs.py; do kaggle datasets download -d cocofioren/indabax-molab-jobs -f $f -p /kaggle/jobs -o -q || exit 1; done && python -u /kaggle/jobs/molab_worker.py"
     proc = subprocess.Popen(cmd, shell=True, env=dict(os.environ, KAGGLE_API_TOKEN=token.value.strip()), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     for line in proc.stdout:
         print(line, end="", flush=True)

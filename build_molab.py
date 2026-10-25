@@ -10,7 +10,8 @@ It publishes the private Kaggle dataset cocofioren/indabax-molab-jobs (the kerne
 molab_worker.py and src/fetch_runs.py) and writes the molab notebook molab/indabax-molab-worker.py. In molab:
 create a notebook with its three cells, choose the GPU (resources menu > GPUs > RTX Pro 6000, Save and
 restart), paste the Kaggle API token into the password box and click Start training. The token stays in the
-session: it is never saved in the notebook. molab_worker.py then
+session: it is never saved in the notebook. The notebook downloads the four files one by one: since 25 October
+Kaggle answers 404 to whole-archive downloads of most new versions of this private dataset. molab_worker.py then
 - downloads train.npz and test.npz to /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 (molab runs
   notebooks as root, so the Kaggle paths of the kernel script work unchanged);
 - runs job.py, relaying its log without the per-iteration lines;
@@ -127,7 +128,7 @@ def _(mo, start, token):
     kaggle_dir.mkdir(exist_ok=True)
     (kaggle_dir / "access_token").write_text(token.value.strip())
     os.chmod(kaggle_dir / "access_token", 0o600)
-    cmd = "python -m pip -q install -U kaggle && kaggle datasets download -d cocofioren/indabax-molab-jobs -p /kaggle/jobs --unzip -o -q && python -u /kaggle/jobs/molab_worker.py"
+    cmd = "python -m pip -q install -U kaggle && mkdir -p /kaggle/jobs && for f in job.py job.json molab_worker.py fetch_runs.py; do kaggle datasets download -d cocofioren/indabax-molab-jobs -f $f -p /kaggle/jobs -o -q || exit 1; done && python -u /kaggle/jobs/molab_worker.py"
     proc = subprocess.Popen(cmd, shell=True, env=dict(os.environ, KAGGLE_API_TOKEN=token.value.strip()), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     for line in proc.stdout:
         print(line, end="", flush=True)
