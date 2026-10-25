@@ -28,6 +28,9 @@ p.add_argument("--full", action="store_true", help="train on all data (no valida
 p.add_argument("--init", default="", help="start from these saved weights (a .pt of a run with the same model) instead of "
                "random ones: fine-tunes a finished run, e.g. on all seasons with --full")
 p.add_argument("--seed", type=int, default=42)
+p.add_argument("--val_season", type=int, default=2022, help="rain season held out for validation, named by the year of "
+               "its December (2022: December 2022 to March 2023, the default); other seasons give out-of-fold "
+               "probabilities for a second-stage model, with the tag v<year>_")
 p.add_argument("--limit", type=int, default=0, help="debug: use only first N train samples")
 p.add_argument("--threads", type=int, default=12)
 p.add_argument("--aug", type=int, default=0, help="1: flips + 90-degree rotations, 2: random translations")
@@ -88,7 +91,8 @@ else:
     X, y, times = tr["X"], tr["y"], tr["times"]; Xt, tt = te["X"], te["times"]
 if a.limit: X, y, times = X[:a.limit], y[:a.limit], times[:a.limit]
 ts = pd.to_datetime(times); tst = pd.to_datetime(tt)
-val = np.asarray((ts >= "2022-12-01") & (ts < "2023-04-01")) if not a.full else np.zeros(len(ts), bool)
+val = np.asarray((ts >= f"{a.val_season}-12-01") & (ts < f"{a.val_season + 1}-04-01")) if not a.full else np.zeros(len(ts), bool)
+assert a.full or val.any(), f"no samples in the {a.val_season} season"
 
 def advected():
     """Advected maps of the training and test samples. In a run queue (data unpacked to .npy files) the first run
@@ -373,7 +377,7 @@ def tune_thresholds(prob, obs):
     return best
 
 import os; os.makedirs(a.out, exist_ok=True)
-tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + ("adv_" if a.advect else "") + ("clim_" if a.clim == 1 else f"clim{a.clim}_" if a.clim else "") + ("oof_" if a.clim and a.clim_oof else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
+tag = ("" if a.arch == "Unet" else a.arch.lower() + "_") + (a.attention + "_" if a.attention else "") + ("adv_" if a.advect else "") + ("clim_" if a.clim == 1 else f"clim{a.clim}_" if a.clim else "") + ("oof_" if a.clim and a.clim_oof else "") + (f"v{a.val_season}_" if a.val_season != 2022 else "") + f"{a.encoder}_s{a.seed}" + ("_full" if a.full else "")
 def masks(prob, thr):
     """Rain maps (0 or 10 mm/h) from one threshold per lead, in float32 to keep memory low."""
     return np.stack([prob[:, j] > thr[j] for j in range(3)], 1).astype(np.float32) * np.float32(10.0)

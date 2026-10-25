@@ -56,6 +56,7 @@ def tag_of(run):
     arch, att = opt(run, "--arch", "Unet"), opt(run, "--attention", "")
     adv, clim = opt(run, "--advect", "0") != "0", opt(run, "--clim", "0")
     return (("" if arch == "Unet" else arch.lower() + "_") + (att + "_" if att else "") + ("adv_" if adv else "") + {"0": "", "1": "clim_", "2": "clim2_", "3": "clim3_"}[clim] + ("oof_" if clim != "0" and opt(run, "--clim_oof", "0") != "0" else "")
+            + (f"v{opt(run, '--val_season', '2022')}_" if opt(run, "--val_season", "2022") != "2022" else "")
             + opt(run, "--encoder", "resnet18")
             + "_s" + opt(run, "--seed", "42") + ("_full" if "--full" in run else ""))
 '''
