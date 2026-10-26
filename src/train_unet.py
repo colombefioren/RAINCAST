@@ -33,7 +33,8 @@ p.add_argument("--val_season", type=int, default=2022, help="rain season held ou
                "probabilities for a second-stage model, with the tag v<year>_")
 p.add_argument("--limit", type=int, default=0, help="debug: use only first N train samples")
 p.add_argument("--threads", type=int, default=12)
-p.add_argument("--aug", type=int, default=0, help="1: flips + 90-degree rotations, 2: random translations")
+p.add_argument("--aug", type=int, default=0, help="1: flips + 90-degree rotations, 2: random translations, 3: translations and a random zoom (scale 0.85 to 1.15, nearest neighbour)")
+p.add_argument("--frame_drop", type=float, default=0.0, help="prob of zeroing one of the two older input frames (t-2h or t-1h) of a training sample")
 p.add_argument("--dropout", type=float, default=0.0)
 p.add_argument("--wd", type=float, default=1e-4, help="AdamW weight decay; larger values (e.g. 0.05) regularise long runs from random weights")
 p.add_argument("--stride", type=int, default=1, help="use every k-th hourly train sample")
@@ -138,6 +139,7 @@ class Rows:
 class DS(torch.utils.data.Dataset):
     def __init__(self, X, y, tf, aug=0, adv=None, mixup=0.0, ch=None):
         self.X, self.y, self.tf, self.aug, self.adv, self.mixup, self.ch = X, y, tf, aug, adv, mixup, ch
+        self.frame_drop = a.frame_drop
     def __len__(self): return len(self.X)
     def target(self, i):
         """3 binary rain maps (> 1 mm/h); with --aux_reg also 3 maps of log1p(rain)/2."""
@@ -166,7 +168,7 @@ class DS(torch.utils.data.Dataset):
             inp, tgt = np.rot90(inp, k, axes=(1, 2)), np.rot90(tgt, k, axes=(1, 2))
             if np.random.rand() < 0.5: inp, tgt = inp[:, :, ::-1], tgt[:, :, ::-1]
             inp, tgt = np.ascontiguousarray(inp), np.ascontiguousarray(tgt)
-        elif self.aug == 2:  # random translation up to 16 px with zero fill: keeps motion direction
+        elif self.aug in (2, 3):  # random translation up to 16 px with zero fill: keeps motion direction
             dy, dx = np.random.randint(-16, 17, size=2)
             def shift(arr):
                 out = np.zeros_like(arr)
@@ -175,7 +177,24 @@ class DS(torch.utils.data.Dataset):
                 out[:, yd, xd] = arr[:, ys, xs]
                 return out
             inp, tgt = shift(inp), shift(tgt)
+            if self.aug == 3:  # random zoom about the centre, nearest neighbour so that the binary targets stay binary
+                sc = np.random.uniform(0.85, 1.15)
+                sy, sx = zoom_index(H, sc), zoom_index(W, sc)
+                inp, tgt = zoom_apply(inp, sy, sx), zoom_apply(tgt, sy, sx)
+        if self.frame_drop > 0 and self.y is not None and np.random.rand() < self.frame_drop:
+            inp[np.random.randint(2)] = 0.0  # the rain maps are the first three channels: t-2h, t-1h, t
         return torch.from_numpy(inp), torch.from_numpy(tgt)
+
+def zoom_index(n, sc):
+    """Source index of each output pixel of a zoom by sc about the centre of an axis of length n, -1 outside."""
+    src = np.rint((np.arange(n) - (n - 1) / 2) / sc + (n - 1) / 2).astype(np.int64)
+    return np.where((src >= 0) & (src < n), src, -1)
+
+def zoom_apply(arr, sy, sx):
+    """Resample (C,H,W) with the zoom indices, zero where the source falls outside the map."""
+    out = arr[:, np.maximum(sy, 0)[:, None], np.maximum(sx, 0)[None, :]]
+    out[:, sy < 0, :] = 0.0; out[:, :, sx < 0] = 0.0
+    return np.ascontiguousarray(out)
 
 tf_tr, tf_te = time_feats(ts), time_feats(tst)
 tr_idx = np.where(~val)[0][::a.stride]
