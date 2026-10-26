@@ -1,0 +1,45 @@
+# Eleventh session, part b (night of 26 to 27 October, replacing the eleventh session's queue on the same sandbox once
+# its first eight runs were in): the soft CSI loss is the first real lever since the climatology. On the plain recipe
+# (band 0.7115 to 0.7132, mean 0.7123) weight 0.5 gives 0.7139, 0.7133, 0.7131 and weight 1.0 gives 0.7147, 0.7141,
+# while the zoom augmentation (0.7112, 0.7117) and the input-frame dropout (0.7114, 0.7114) sit at the bottom of the
+# band. So the base recipe now carries --csi_w 1.0 and the session, in order: sweeps the weight (2.0, 3.0, 1.5, in
+# pairs), trains blend members at weight 1.0 (four seeds, plus a neighbourhood-climatology pair for diversity) and at
+# weight 2.0, then retests the levers that the plain recipe never confirmed on top of the CSI loss (learning rate,
+# efficientnet-b2, resnet18, 4x upscaling, resnext50, densenet121, batch 8, the plain U-Net decoder), and last the
+# neighbourhood-climatology twins (s1905, s1906). Seeds 1643 to 1650 and 1613 to 1616 are free in the 16xx range
+# (their twins would be 17xx). The worker starts only what fits the budget; the Tuesday session takes the rest.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--csi_w 2.0 --seed 1679
+--csi_w 2.0 --seed 1680
+--csi_w 3.0 --seed 1681
+--csi_w 3.0 --seed 1682
+--csi_w 1.5 --seed 1683
+--csi_w 1.5 --seed 1684
+--seed 1685
+--seed 1686
+--seed 1687
+--seed 1688
+--clim 3 --seed 1691
+--clim 3 --seed 1692
+--csi_w 2.0 --seed 1689
+--csi_w 2.0 --seed 1690
+--lr 2e-3 --seed 1693
+--lr 2e-3 --seed 1694
+--lr 5e-4 --seed 1695
+--lr 5e-4 --seed 1696
+--encoder efficientnet-b2 --seed 1643
+--encoder efficientnet-b2 --seed 1644
+--encoder resnet18 --seed 1645
+--encoder resnet18 --seed 1646
+--upscale 4 --seed 1647
+--upscale 4 --seed 1648
+--encoder resnext50_32x4d --seed 1649
+--encoder resnext50_32x4d --seed 1650
+--encoder densenet121 --seed 1697
+--encoder densenet121 --seed 1698
+--bs 8 --seed 1613
+--bs 8 --seed 1614
+--arch Unet --seed 1615
+--arch Unet --seed 1616
+--clim 3 --seed 1905 --full
+--clim 3 --seed 1906 --full
