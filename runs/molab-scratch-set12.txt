@@ -1,0 +1,39 @@
+# Twelfth molab session (Tuesday 27 October, relaunched when session 11b's sandbox ends at about 05:57): the soft
+# CSI loss is the lever (plain recipe 0.7123 on average; weight 0.5: 0.7139, 0.7133, 0.7131; weight 1.0: 0.7147,
+# 0.7141; weight 2.0: 0.7144, 0.7135), so the final blend needs CSI members with full-data twins (a twin is worth
+# about +0.006 on the public board once decoded). First the twins of the CSI members trained so far and overnight
+# (weights 1.0 and 2.0 first, then the neighbourhood-climatology pair, the 1.5 and 3.0 pairs), then new members
+# at weights 1.0 and 2.0 (seeds free in the 16xx range), last the twins of the weight-0.5 runs. The base recipe
+# carries --csi_w 1.0; a twin's weight must match its validation run's. Provisional list published at 23:10 on
+# 26 October; rebuilt at about 05:50 from session 11b's results (members under 0.7135 lose their twin, a winning
+# lever gets its pair and twins).
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--seed 1777 --full
+--seed 1778 --full
+--csi_w 2.0 --seed 1779 --full
+--csi_w 2.0 --seed 1780 --full
+--seed 1785 --full
+--seed 1786 --full
+--seed 1787 --full
+--seed 1788 --full
+--csi_w 2.0 --seed 1789 --full
+--csi_w 2.0 --seed 1790 --full
+--clim 3 --seed 1791 --full
+--clim 3 --seed 1792 --full
+--csi_w 1.5 --seed 1783 --full
+--csi_w 1.5 --seed 1784 --full
+--csi_w 3.0 --seed 1781 --full
+--csi_w 3.0 --seed 1782 --full
+--seed 1617
+--seed 1618
+--seed 1619
+--seed 1620
+--csi_w 2.0 --seed 1623
+--csi_w 2.0 --seed 1624
+--csi_w 2.0 --seed 1625
+--csi_w 2.0 --seed 1626
+--clim 3 --seed 1627
+--clim 3 --seed 1628
+--csi_w 0.5 --seed 1737 --full
+--csi_w 0.5 --seed 1775 --full
+--csi_w 0.5 --seed 1776 --full
