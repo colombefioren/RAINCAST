@@ -52,7 +52,7 @@ if found:
 else:
     log("no train.npz under /kaggle/input: every run reads its own --data path")
 
-opt = lambda run, k, d: run[run.index(k) + 1] if k in run else d
+opt = lambda run, k, d: run[len(run) - run[::-1].index(k)] if k in run else d  # the last occurrence wins, as in argparse
 def tag_of(run):
     """The file prefix train_unet.py gives a run (arch, attention, advection, climatology, encoder, seed, full)."""
     arch, att = opt(run, "--arch", "Unet"), opt(run, "--attention", "")

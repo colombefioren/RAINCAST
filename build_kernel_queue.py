@@ -50,7 +50,7 @@ assert base and runs, __doc__
 args = [[x.replace("/kaggle/working", "/kaggle/tmp/out") for x in r] + ([] if gpu else ["--xla", "1"]) for r in runs]
 assert all(r[r.index("--out") + 1] == "/kaggle/tmp/out" for r in args), "every run needs --out /kaggle/working"
 
-HELPERS = r'''opt = lambda run, k, d: run[run.index(k) + 1] if k in run else d
+HELPERS = r'''opt = lambda run, k, d: run[len(run) - run[::-1].index(k)] if k in run else d  # the last occurrence wins, as in argparse
 def tag_of(run):
     """The file prefix train_unet.py gives a run (arch, attention, advection, climatology, encoder, seed, full)."""
     arch, att = opt(run, "--arch", "Unet"), opt(run, "--attention", "")
