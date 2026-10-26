@@ -4,7 +4,7 @@
 # from random weights (multi-scale FSS, auxiliary regression head, soft CSI, positive weight 4), wet sampling,
 # temporal mixup and scse attention. Validation runs only; the next session trains twins of the winners. Then the
 # full-data twins of the ninth session's neighbourhood-climatology pair (s1805, s1806: +0.0003 on the blend).
-# Three runs at a time to test the throughput of the 4-CPU machine.
+# Two runs at a time: the ninth session showed epoch times double with two runs, so a third adds no throughput.
 base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1
 --wd 0.05 --seed 1631
 --dropout 0.3 --seed 1632
