@@ -7,9 +7,9 @@ A full TPU session leaves about 10 GB on Kaggle (see build_kernel_queue.py). Kep
   test probability of the same k epochs, both under the blend's name (e.g. <tag>_last3_valprob.npy and
   <tag>_last3_testprob.npy, the pair src/blend.py expects);
 - for every full-data run: the mean test probability of its last k epochs, with k taken from its validation
-  twin (the run with the same settings apart from the seed and --full), or a default without a twin in the
-  session (4, or the optional third argument: 6 for the twins of 14-epoch runs, whose validation runs all pick
-  their last 6 epochs, when they train in a session of their own).
+  twin (the run with the same settings apart from the seed and --full) or, without a twin in the session, the
+  number of epochs the run kept (--keep_epochs: 6 for the twins of 14-epoch runs, whose validation runs all pick
+  their last 6 epochs), unless the optional third argument fixes k.
 Per-epoch files are deleted once averaged.
 
 Usage: python src/fetch_runs.py <owner>/<kernel-slug> <output folder> [last-k for full-data runs without a twin]
@@ -18,7 +18,7 @@ The first argument may also be a local folder holding a downloaded output (used 
 import json, os, re, shutil, subprocess, sys, numpy as np
 
 source, out = sys.argv[1], sys.argv[2]
-DEFAULT_K = int(sys.argv[3]) if len(sys.argv) > 3 else 4
+DEFAULT_K = int(sys.argv[3]) if len(sys.argv) > 3 else 0  # 0: a full-data run without a twin averages the epochs it kept
 KAGGLE = os.environ.get("KAGGLE", "kaggle")
 os.makedirs(out, exist_ok=True)
 
@@ -38,6 +38,10 @@ def twin_key(args):
         elif a[i] == "--full": i += 1
         else: key.append(a[i]); i += 1
     return " ".join(key)
+
+def opt(a, flag, default):
+    """The value after the last occurrence of a flag: the run line overrides the base line, as in argparse."""
+    return a[len(a) - a[::-1].index(flag)] if flag in a else default
 
 def mean_test(tag, k, epochs):
     """Average the test probabilities of the given epochs into <tag>_<k>_testprob.npy."""
@@ -69,7 +73,7 @@ for r in runs:
         print(f"{r['tag']}: {k} (epochs {epochs}) validation {blends[k]['val_fss']:.4f}")
 for r in runs:
     if "--full" not in r["args"].split(): continue
-    a = r["args"].split(); n_ep = int(a[a.index("--epochs") + 1]) if "--epochs" in a else 8
+    a = r["args"].split(); n_ep = int(opt(a, "--epochs", 8)); d = DEFAULT_K or int(opt(a, "--keep_epochs", 4))
     twin = twin_key(r["args"]) in best
-    k, epochs = best[twin_key(r["args"])] if twin else (f"last{DEFAULT_K}", list(range(n_ep - DEFAULT_K, n_ep)))
+    k, epochs = best[twin_key(r["args"])] if twin else (f"last{d}", list(range(n_ep - d, n_ep)))
     if mean_test(r["tag"], k, epochs): print(f"{r['tag']}: {k} (epochs {epochs})", "from its validation twin" if twin else "by default, no validation twin")
