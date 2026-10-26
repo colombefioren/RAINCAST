@@ -2,7 +2,8 @@
 # (--clim 1 --clim_oof 1, 14 epochs), after the ninth session's 20-epoch and resnet50 tests lost 0.002 to 0.005:
 # regularisation (weight decay 0.05, dropout 0.3, both), a shorter 12-epoch schedule, the loss variants never tried
 # from random weights (multi-scale FSS, auxiliary regression head, soft CSI, positive weight 4), wet sampling,
-# temporal mixup and scse attention. Validation runs only; the next session trains twins of the winners.
+# temporal mixup and scse attention. Validation runs only; the next session trains twins of the winners. Then the
+# full-data twins of the ninth session's neighbourhood-climatology pair (s1805, s1806: +0.0003 on the blend).
 # Three runs at a time to test the throughput of the 4-CPU machine.
 base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1
 --wd 0.05 --seed 1631
@@ -17,3 +18,5 @@ base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle
 --mixup 0.2 --seed 1640
 --attention scse --seed 1641
 --wd 0.05 --epochs 20 --keep_epochs 8 --seed 1642
+--clim 3 --seed 1905 --full
+--clim 3 --seed 1906 --full
