@@ -1,0 +1,19 @@
+# Tenth molab session (26 to 27 October): twelve single-model tests on the out-of-fold climatology recipe
+# (--clim 1 --clim_oof 1, 14 epochs), after the ninth session's 20-epoch and resnet50 tests lost 0.002 to 0.005:
+# regularisation (weight decay 0.05, dropout 0.3, both), a shorter 12-epoch schedule, the loss variants never tried
+# from random weights (multi-scale FSS, auxiliary regression head, soft CSI, positive weight 4), wet sampling,
+# temporal mixup and scse attention. Validation runs only; the next session trains twins of the winners.
+# Three runs at a time to test the throughput of the 4-CPU machine.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1
+--wd 0.05 --seed 1631
+--dropout 0.3 --seed 1632
+--wd 0.05 --dropout 0.3 --seed 1633
+--epochs 12 --keep_epochs 5 --seed 1634
+--ms_fss 1 --seed 1635
+--aux_reg 0.1 --seed 1636
+--csi_w 0.5 --seed 1637
+--pos_w 4 --seed 1638
+--wet_sampling 1 --seed 1639
+--mixup 0.2 --seed 1640
+--attention scse --seed 1641
+--wd 0.05 --epochs 20 --keep_epochs 8 --seed 1642
