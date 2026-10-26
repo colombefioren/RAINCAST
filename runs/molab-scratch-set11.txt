@@ -1,17 +1,23 @@
 # Eleventh molab session (overnight 26 to 27 October, relaunched when the tenth session's sandbox ends): the tenth session showed that regularisation does not move
-# a 14-epoch run (data-limited, not overfitting), so this session tests what changes the data or the inductive bias:
-# a zoom augmentation (--aug 3: translations plus a 0.85 to 1.15 zoom), an input-frame dropout, 4x upscaling, and
-# four encoders never trained from random weights on this recipe (resnext50, densenet121, efficientnet-b2,
-# resnet18). Pairs of seeds, so that a 0.001 difference can be told from seed noise (band 0.7115 to 0.7132).
-# Then the full-data twins of the ninth session's neighbourhood-climatology pair (s1905, s1906, if the tenth
-# session's sandbox ended before them) and of the tenth session's in-band variants (dropout 0.3, 12 epochs,
-# auxiliary regression) as blend members. Last, to fill the 12-hour sandbox: the learning rate (never swept from
-# random weights), batch 8, and the plain U-Net decoder on the climatology recipe.
+# a 14-epoch run (data-limited, not overfitting), so this session tests what changes the data, the loss or the inductive bias:
+# a zoom augmentation (--aug 3: translations plus a 0.85 to 1.15 zoom), an input-frame dropout, the soft CSI loss
+# (the tenth session's best single run, s1637 at 0.7139 with --csi_w 0.5: a confirmation pair and a pair at weight
+# 1.0), 4x upscaling, and four encoders never trained from random weights on this recipe (resnext50, densenet121,
+# efficientnet-b2, resnet18). Pairs of seeds, so that a 0.001 difference can be told from seed noise (band 0.7115
+# to 0.7132). Then, to fill the 12-hour sandbox: the learning rate (never swept from random weights), batch 8, and
+# the plain U-Net decoder on the climatology recipe. Last, as far as the budget allows, the full-data twins of the
+# tenth session's blend-member candidates (CSI loss, dropout 0.3, 12 epochs, auxiliary regression) and of the ninth
+# session's neighbourhood-climatology pair (s1905, s1906: the tenth session trained them but averaged their last 4
+# epochs instead of the last 6 their validation runs pick; fetch_runs.py now reads --keep_epochs for that).
 base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1
 --aug 3 --seed 1651
 --aug 3 --seed 1652
 --frame_drop 0.15 --seed 1653
 --frame_drop 0.15 --seed 1654
+--csi_w 0.5 --seed 1675
+--csi_w 0.5 --seed 1676
+--csi_w 1.0 --seed 1677
+--csi_w 1.0 --seed 1678
 --encoder resnext50_32x4d --seed 1657
 --encoder resnext50_32x4d --seed 1658
 --encoder densenet121 --seed 1659
@@ -23,11 +29,6 @@ base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle
 --upscale 4 --seed 1655
 --upscale 4 --seed 1656
 --aug 3 --frame_drop 0.15 --seed 1665
---clim 3 --seed 1905 --full
---clim 3 --seed 1906 --full
---dropout 0.3 --seed 1732 --full
---epochs 12 --keep_epochs 5 --seed 1734 --full
---aux_reg 0.1 --seed 1736 --full
 --lr 2e-3 --seed 1667
 --lr 2e-3 --seed 1668
 --lr 5e-4 --seed 1669
@@ -36,3 +37,9 @@ base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle
 --bs 8 --seed 1672
 --arch Unet --seed 1673
 --arch Unet --seed 1674
+--csi_w 0.5 --seed 1737 --full
+--dropout 0.3 --seed 1732 --full
+--epochs 12 --keep_epochs 5 --seed 1734 --full
+--aux_reg 0.1 --seed 1736 --full
+--clim 3 --seed 1905 --full
+--clim 3 --seed 1906 --full
