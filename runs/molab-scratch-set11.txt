@@ -1,0 +1,29 @@
+# Eleventh molab session (27 October, Tuesday relaunch): the tenth session showed that regularisation does not move
+# a 14-epoch run (data-limited, not overfitting), so this session tests what changes the data or the inductive bias:
+# a zoom augmentation (--aug 3: translations plus a 0.85 to 1.15 zoom), an input-frame dropout, 4x upscaling, and
+# four encoders never trained from random weights on this recipe (resnext50, densenet121, efficientnet-b2,
+# resnet18). Pairs of seeds, so that a 0.001 difference can be told from seed noise (band 0.7115 to 0.7132).
+# Then the full-data twins of the ninth session's neighbourhood-climatology pair (s1905, s1906, if the tenth
+# session's sandbox ended before them) and of the tenth session's in-band variants (dropout 0.3, 12 epochs,
+# auxiliary regression) as blend members.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1
+--aug 3 --seed 1651
+--aug 3 --seed 1652
+--frame_drop 0.15 --seed 1653
+--frame_drop 0.15 --seed 1654
+--encoder resnext50_32x4d --seed 1657
+--encoder resnext50_32x4d --seed 1658
+--encoder densenet121 --seed 1659
+--encoder densenet121 --seed 1660
+--encoder efficientnet-b2 --seed 1661
+--encoder efficientnet-b2 --seed 1662
+--encoder resnet18 --seed 1663
+--encoder resnet18 --seed 1664
+--upscale 4 --seed 1655
+--upscale 4 --seed 1656
+--aug 3 --frame_drop 0.15 --seed 1665
+--clim 3 --seed 1905 --full
+--clim 3 --seed 1906 --full
+--dropout 0.3 --seed 1732 --full
+--epochs 12 --keep_epochs 5 --seed 1734 --full
+--aux_reg 0.1 --seed 1736 --full
