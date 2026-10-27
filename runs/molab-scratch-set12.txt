@@ -1,41 +1,44 @@
-# Twelfth molab session (Tuesday 27 October, relaunched when session 11b's sandbox ends at about 05:57): the soft
-# CSI loss is the lever (plain recipe 0.7123 on average; weight 0.5: 0.7139, 0.7133, 0.7131; weight 1.0: 0.7147,
-# 0.7141; weight 1.5: 0.7137, 0.7143; weight 2.0: 0.7144, 0.7135; weight 3.0: 0.7147, 0.7145), so the final blend
-# needs CSI members with full-data twins (a twin is worth about +0.006 on the public board once decoded). First
-# the twins of the CSI members trained so far (weights 1.0, 3.0 and 2.0 by their pair means), then a weight-5.0
-# pair to see whether the plateau of weights 1.0 to 3.0 goes on, then the twins of the overnight members (weight
-# 1.0, weight 2.0, the neighbourhood-climatology pair, the 1.5 pair), then new members at weights 1.0, 3.0 and
-# 2.0 (seeds free in the 16xx range), last the twins of the weight-0.5 runs. The base recipe carries --csi_w 1.0;
-# a twin's weight must match its validation run's. Provisional list published at 23:10 on 26 October, reordered
-# at 00:35 on 27 October after the sweep; rebuilt at about 05:50 from session 11b's results (members under
-# 0.7135 lose their twin, a winning lever gets its pair and twins).
+# Twelfth molab session (Tuesday 27 October, relaunched when session 11b's sandbox ends at about 05:57). The soft
+# CSI loss is the lever (plain recipe 0.7123 on average; weights 1.0 to 3.0 all average 0.7140 to 0.7146), but the
+# blend is saturated: the 17 CSI members trained so far add +0.00026 on validation over submission 37's 41 members,
+# a whole new model family is worth about +0.0004 and one more member of a known family about +0.00002. So this
+# session (a) trains the full-data twins of the CSI members at or above 0.7135 (a twin is worth about +0.006 on the
+# public board once decoded; a twin's arguments must match its validation run's: weight, learning rate, encoder,
+# climatology), best members first, (b) tests two loss settings on a pair each (weight 5.0: does the plateau go on;
+# BCE positive weight 4 with weight 3.0: the CSI term now sets the operating point), (c) trains new members of the
+# in-band families that the blend can mix (efficientnet-b2, learning rate 2e-3, plain U-Net decoder, neighbourhood
+# climatology, resnet18); their twins belong to Wednesday's session. The neighbourhood-climatology members s1691 and
+# s1692 already have twins: session 11b trained them under the seeds 1905 and 1906 (the lines were meant for the
+# plain climatology members, but the base recipe had changed to the CSI loss, so they match s1691 and s1692 by
+# their arguments). The base recipe carries --csi_w 1.0. Provisional list
+# published at 23:10 on 26 October, reordered at 00:35 on 27 October, rebuilt at 05:45 from session 11b's results.
 base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
 --seed 1777 --full
 --seed 1778 --full
 --csi_w 3.0 --seed 1781 --full
 --csi_w 3.0 --seed 1782 --full
---csi_w 2.0 --seed 1779 --full
---csi_w 2.0 --seed 1780 --full
+--seed 1785 --full
+--lr 2e-3 --seed 1793 --full
 --csi_w 5.0 --seed 1619
 --csi_w 5.0 --seed 1620
---seed 1785 --full
---seed 1786 --full
---seed 1787 --full
---seed 1788 --full
---csi_w 2.0 --seed 1789 --full
---csi_w 2.0 --seed 1790 --full
---clim 3 --seed 1791 --full
---clim 3 --seed 1792 --full
---csi_w 1.5 --seed 1783 --full
+--csi_w 2.0 --seed 1779 --full
 --csi_w 1.5 --seed 1784 --full
---seed 1617
---seed 1618
---csi_w 3.0 --seed 1623
---csi_w 3.0 --seed 1624
---csi_w 2.0 --seed 1625
---csi_w 2.0 --seed 1626
+--csi_w 2.0 --seed 1789 --full
+--csi_w 0.5 --seed 1737 --full
+--csi_w 2.0 --seed 1790 --full
+--csi_w 3.0 --pos_w 4 --seed 1629
+--csi_w 3.0 --pos_w 4 --seed 1630
+--encoder efficientnet-b2 --seed 1744 --full
+--csi_w 1.5 --seed 1783 --full
+--seed 1788 --full
+--csi_w 2.0 --seed 1780 --full
+--encoder efficientnet-b2 --seed 1617
+--encoder efficientnet-b2 --seed 1618
+--lr 2e-3 --seed 1623
+--lr 2e-3 --seed 1624
+--arch Unet --seed 1625
+--arch Unet --seed 1626
 --clim 3 --seed 1627
 --clim 3 --seed 1628
---csi_w 0.5 --seed 1737 --full
---csi_w 0.5 --seed 1775 --full
---csi_w 0.5 --seed 1776 --full
+--encoder resnet18 --seed 1645
+--encoder resnet18 --seed 1646
