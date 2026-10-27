@@ -1,0 +1,19 @@
+# Session 12b (Tuesday 27 October, afternoon): the twelfth session finished its queue at about 14:46, four hours
+# before its sandbox ends at 19:15, so this list restarts the worker on the same sandbox from the restart cell.
+# It trains the full-data twins of the new members of session 12 that scored at or above 0.7135 (a member needs
+# its twin on the test side before it can enter a submission): the learning-rate 2e-3 members s1623 (0.7146) and
+# s1624 (0.7143) and the neighbourhood-climatology member s1628 (0.7137). The efficientnet-b2 member s1618
+# (0.7116), the resnet18 member s1645 (0.7127) and the neighbourhood-climatology member s1627 (0.7133) stay out.
+# The queue then continues the learning-rate 2e-3 family, the strongest family so far (s1693 0.7152, s1623 0.7146,
+# s1624 0.7143, s1694 0.7130), with validation members whose twins belong to Wednesday's session. The base recipe
+# carries --csi_w 1.0.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--lr 2e-3 --seed 1723 --full
+--lr 2e-3 --seed 1724 --full
+--clim 3 --seed 1728 --full
+--lr 2e-3 --seed 1631
+--lr 2e-3 --seed 1632
+--lr 2e-3 --seed 1633
+--lr 2e-3 --seed 1634
+--lr 2e-3 --seed 1635
+--lr 2e-3 --seed 1636
