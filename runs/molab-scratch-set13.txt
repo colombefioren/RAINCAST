@@ -1,0 +1,27 @@
+# Thirteenth molab session (Wednesday 28 October, the last full day before the deadline on Thursday at 12:00).
+# The blend is saturated for members of the known families: the two learning-rate 2e-3 members of session 12b
+# added +0.00001, the weight-4 and drop-two tests tied or lost, so more seeds of known recipes are not worth
+# GPU time. What still pays is a new family that the blend can mix (a whole family was worth about +0.0004 on
+# validation when the climatology members joined), so this list tests untried settings in pairs, cheapest first:
+# squeeze-and-excitation attention in the decoder, translation-plus-zoom augmentation, the FPN decoder, a
+# 20-epoch schedule with 8 kept epochs, the resnet50 encoder, the DeepLabV3Plus decoder, a 2x upscale. The
+# full-data twins of the two best members of session 12b (s1634 0.7154, s1636 0.7144) close the list as insurance.
+# Pairs whose mean reaches the band (0.7135 or better) get their twins in a restart of the worker around midday
+# from the restart cell, on the same sandbox. The base recipe carries --csi_w 1.0.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--attention scse --seed 1651
+--attention scse --seed 1652
+--aug 3 --seed 1653
+--aug 3 --seed 1654
+--arch FPN --seed 1655
+--arch FPN --seed 1656
+--epochs 20 --keep_epochs 8 --seed 1657
+--epochs 20 --keep_epochs 8 --seed 1658
+--encoder resnet50 --seed 1659
+--encoder resnet50 --seed 1660
+--arch DeepLabV3Plus --seed 1661
+--arch DeepLabV3Plus --seed 1662
+--upscale 2 --seed 1663
+--upscale 2 --seed 1664
+--lr 2e-3 --seed 1734 --full
+--lr 2e-3 --seed 1736 --full
