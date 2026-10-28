@@ -6,5 +6,5 @@ torch
 torchvision
 segmentation-models-pytorch
 timm
-matplotlib
+opencv-python-headless
 kaggle

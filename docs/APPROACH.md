@@ -7,9 +7,9 @@ every 3x3 window between forecast and observation. Two consequences:
 
 1. Predicting exact rain amounts is wasted effort. The task is binary segmentation: rain / no rain at
    each of three lead times. The submission writes 10 mm/h where the model says rain and 0 elsewhere.
-2. FSS rewards forecasts whose rainy area is about the same size as the observed area. A model that
-   outputs probabilities needs a decision threshold per lead time, tuned on validation data to maximise
-   FSS. The best threshold is usually below 0.5 because rain covers only about 5 % of pixels.
+2. FSS rewards forecasts whose rainy area is about the same size as the observed area, and in uncertain
+   areas it rewards a partial mask whose local density matches the chance of rain. A model that outputs
+   probabilities therefore needs a decoder tuned on validation data, not a fixed threshold.
 
 ## Data
 
@@ -30,40 +30,36 @@ every 3x3 window between forecast and observation. Two consequences:
 | All rain | 0.099 |
 
 Persistence is strong at +1h (0.76) and weak at +3h (0.46). The model has to learn motion and
-growth/decay of rain cells.
+growth or decay of rain cells.
 
-## Model
+## One network
 
-- U-Net and U-Net++ (`segmentation-models-pytorch`) with a ResNet encoder, trained from random weights. Since
-  21 October the rules forbid weights pretrained outside the competition data; submissions 1 to 15 used
-  ImageNet initialisation, which the rules allowed until then (see `docs/RULES.md`).
+- U-Net++ (`segmentation-models-pytorch`) with a ResNet-34 encoder, trained from random weights. The rules
+  forbid weights pretrained outside the competition data; the submissions made before 21 October used
+  ImageNet initialisation, which the rules allowed at that time (see `RULES.md`), and were not selected.
 - Inputs, 8 channels: the three rain maps as log1p(rain)/2, two fixed coordinate channels (standardised
   row and column index, the CoordConv technique; they equal the standardised latitude and longitude
-  grids), sin and cos of the hour, and the position within the rainy season.
+  grids), sin and cos of the hour, and the position within the rainy season. The out-of-fold climatology
+  members add three channels: how often each pixel had rain above 1 mm/h at the hour of day of each lead
+  time, counted over the training rows and smoothed over one hour and 5x5 pixels. Training samples read a
+  table counted without their own season, as validation and test samples do; otherwise the table contains
+  the sample's own target and the network trusts it more than it deserves on a new season.
 - Outputs, 3 channels: probability of rain above 1 mm/h at +1h, +2h, +3h.
 - Loss: binary cross-entropy with positive weight 8 (rain is rare) plus a soft FSS loss, which is the
   metric itself computed on probabilities instead of binary masks, so the network optimises what is
-  scored.
-- Optimiser AdamW (learning rate 5e-4, weight decay 1e-4), one-cycle learning rate schedule, batch 32,
-  6 epochs.
+  scored. The strongest members add a soft CSI (intersection over union) term with weight 1 to 3: it
+  raised a single run from about 0.7125 to about 0.7145 on the held-out season.
+- Optimiser AdamW (learning rate 1e-3, weight decay 1e-4), one-cycle schedule, batch 16, 14 epochs
+  (12 to 24 for the earliest members), mixed precision.
 - Regularisation: dropout 0.2 before the output layer and random translations of up to 16 pixels.
-  Rotations and flips were tried and hurt, because rain over Madagascar mostly moves in one direction
-  and a rotated map teaches the network wrong motion.
-- Input upscaling (best single change so far, about +0.012 FSS on validation): the 8-channel input is
-  bilinearly enlarged from 128x128 to 256x256 before the encoder, and the 3 output maps are averaged
-  back down to 128x128. A ResNet shrinks its input 32 times, so a 128-pixel map becomes a 4x4 grid at
-  the bottom of the U-Net; at 256 pixels the grid is 8x8 and the first layers see rain cells that span
-  more pixels, so more spatial detail reaches the deep layers.
-- Epoch averaging: the test probabilities of the last 5 epochs are averaged, which beats the single
-  best checkpoint by about +0.004 because each epoch makes slightly different mistakes.
-- Thresholds are tuned per lead time on the held-out season (Dec 2022 to Mar 2023), from the averaged
-  probabilities.
-- For the final submissions the same recipe is retrained on all seasons including December 2023, the
-  closest data to the test period, with the thresholds from the matching validation run. Several
-  seeds and recipes are averaged before thresholding. With thresholds, training on all seasons was worth only
-  about +0.002 on the public leaderboard (submissions 4 and 5). With the decoder it is worth about
-  +0.006 (submissions 12 and 13, same model and calibration, only the training seasons differ). The
-  full-data models are decoded with the calibration table and mu fitted on their validation twins.
+  Rotations and flips hurt, because rain over Madagascar mostly moves in one direction and a rotated map
+  teaches the network wrong motion.
+- Input upscaling (about +0.012 FSS for a single run): the input is bilinearly enlarged from 128x128 to
+  384x384 before the encoder, and the output maps are averaged back down. A ResNet shrinks its input 32
+  times, so a 128-pixel map becomes a 4x4 grid at the bottom of the network; at 384 pixels the grid is
+  12x12 and the deep layers keep spatial detail.
+- Epoch averaging: the probabilities of the last 6 epochs are averaged, which beats the single best
+  checkpoint by about +0.004 because each epoch makes slightly different mistakes.
 
 ## From probabilities to a rain mask
 
@@ -77,17 +73,34 @@ matches the expected rain coverage. `src/fss_decode.py` does this:
    2 * sum(M * q) / (sum(box(M)^2) + C), with q = box(box(p)) and C independent of M.
 3. Maximise sum(M * q) - mu * sum(box(M)^2) with iterated conditional modes. Pixels on the same
    position of a 3x3 grid cannot interact, so each of the 9 groups is updated in one vectorised step.
-   mu is tuned per lead time on validation (theory: half the achievable FSS, about 0.33 to 0.43).
+   mu is tuned per lead time on validation (theory: half the achievable FSS; 0.425, 0.375 and 0.35).
 
 Out-of-sample check (calibration and mu fitted on alternate weeks, scored on the other weeks):
-+0.04 at +1h, +0.05 at +2h, +0.065 at +3h. The gain grows with lead time because uncertainty grows.
++0.04 at +1h, +0.05 at +2h, +0.065 at +3h over tuned thresholds. The gain grows with lead time because
+uncertainty grows.
 
-## What was tried and rejected
+## Blend
 
-Recorded in `docs/JOURNAL.md` as it happens.
+Fifty-eight validation runs are averaged with weights by family: 1 for the plain and climatology members
+of the first sessions, 2 for the out-of-fold climatology members, 3 for the CSI-loss members
+(`../final/members.md`). The blend gains about +0.05 over the best single run before decoding; with
+decoding it reaches 0.7699 on the held-out season. Beyond about forty members, more seeds of the same
+family tie; the last gains came from new families (climatology inputs, then the CSI loss).
 
-## Tools
+## Test side
 
-Python, NumPy, pandas, SciPy, PyTorch, segmentation-models-pytorch, timm, Kaggle CLI. Development was
-done with the help of an AI coding assistant (Claude); every script was reviewed and run by the
-participant.
+For the test set, each validation member is replaced by its full-data twin: the same settings, seed + 100,
+trained on all seasons including December 2023, the closest data to the 2024 test period. The twins' test
+probabilities are blended with the same weights and decoded with the calibration and mu fitted on the
+validation members. Training on all seasons was worth about +0.006 on the public leaderboard with the
+decoder (two submissions that differed only in the training seasons).
+
+## Tried and not kept
+
+Rotation and flip augmentation, zoom augmentation, input-frame dropout, temporal mixup, wet-sample
+oversampling, multi-scale FSS terms, an auxiliary regression head, advected input channels, test-time
+augmentation by shifts, dilation of the decoded masks, calibration per dry-to-wet quartile, a
+neighbourhood-aware calibration (`src/context_calib.py`, +0.001 on validation but no gain on the public
+board), encoders other than ResNet-34 (ResNet-18, ResNet-50, EfficientNet-B2 tie or lose), weight decay
+0.05 and dropout 0.4 on long schedules. Everything was measured on the held-out season; the public
+leaderboard served only to confirm gains.

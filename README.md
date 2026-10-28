@@ -1,248 +1,150 @@
 # INDABAX-RAINFALL
 
-Rainfall nowcasting over Madagascar for the IndabaX Madagascar 2026 hackathon on Kaggle
-(`hackathon-IndabaX-MDG-2026`). Given three hourly rain maps (t-2h, t-1h, t), predict the rain maps
-at t+1h, t+2h and t+3h. Evaluated with the Fractions Skill Score (FSS) at a 1 mm/h threshold and a
+Rainfall nowcasting over Madagascar for the Kaggle hackathon *Hackathon - IndabaX Madagascar 2026*
+(`hackathon-IndabaX-MDG-2026`). Given three hourly rain maps (t-2h, t-1h, t) of 128x128 pixels, predict the
+rain maps at t+1h, t+2h and t+3h. The score is the Fractions Skill Score (FSS) at a 1 mm/h threshold with a
 3x3 pixel neighbourhood, averaged over the three lead times.
+
+The final submission blends 58 U-Net++ networks trained from random weights on the competition data only,
+then calibrates the blended probabilities and decodes them into the rain mask with the highest expected FSS.
+It scores 0.7699 on the held-out season (December 2022 to March 2023) and 0.78384 on the public leaderboard.
+
+## Method
+
+**The metric sets the task.** FSS only asks whether each pixel is above 1 mm/h, then compares the fraction
+of rainy pixels in every 3x3 window. So the model predicts, for each lead time, the probability that a pixel
+exceeds 1 mm/h, and the submission writes 10 mm/h where the decoded mask says rain and 0 elsewhere.
+
+**One network** (`src/train_unet.py`):
+
+- U-Net++ decoder with a ResNet-34 encoder (`segmentation-models-pytorch`), random initialisation.
+- Inputs: the three rain maps as log1p(rain)/2, two fixed coordinate channels (standardised row and column
+  index), sine and cosine of the hour, the position in the rainy season. Most members add three climatology
+  channels: how often each pixel had rain at the hour of each lead time, counted on the training rows and,
+  for the training samples, without the sample's own season (out of fold).
+- The input is enlarged 3x (bilinear) before the encoder and the logits are averaged back, so the encoder's
+  deep layers keep spatial detail.
+- Loss: binary cross-entropy with positive weight 8 plus a soft FSS term (the metric on probabilities); the
+  strongest members add a soft CSI (intersection over union) term.
+- AdamW, learning rate 1e-3 with a one-cycle schedule, batch 16, 14 epochs, dropout 0.2 before the output
+  layer, random translations of up to 16 pixels, mixed precision.
+- The probabilities of the last 6 epochs are averaged: each epoch makes slightly different mistakes.
+
+**Validation.** The 2022-2023 season (2,887 hourly samples) is held out of training; everything that is
+tuned (thresholds, calibration, decoder) is tuned there. Consecutive samples overlap in time, so a random
+split would leak.
+
+**Blend and decoder** (`src/blend.py`, `src/fss_decode.py`):
+
+1. The validation probabilities of the 58 members are averaged with weights 1, 2 or 3 by family
+   (`final/members.md`).
+2. An isotonic fit per lead time maps the blended probability to the observed rain frequency.
+3. With calibrated probabilities p, the expected FSS of a mask M is a ratio whose numerator is linear in M,
+   with q = box(box(p)). The decoder maximises sum(M q) - mu sum(box(M)^2) by iterated conditional modes
+   (mu = 0.425, 0.375, 0.35 per lead time), which puts partial masks where rain is uncertain instead of a
+   hard threshold. It reads only the sample's own probability map.
+
+**Test side.** Every validation member has a full-data twin: the same settings and seed + 100, trained on
+all seasons including December 2023, the closest data to the 2024 test period. The twins' test probabilities
+are blended with the same weights and decoded with the calibration and mu fitted on the validation members.
+
+## Results on the held-out season
+
+| Forecast | FSS |
+| --- | --- |
+| Persistence (copy the map at t) | 0.604 |
+| Best single network, thresholds per lead time | 0.7154 |
+| 58-member blend, thresholds per lead time | 0.7187 |
+| 58-member blend, calibrated and decoded (final) | 0.7699 |
+
+Public leaderboard: 0.78384 (200 test samples, scored on a public subset).
+
+## Rules
+
+Each test sample is processed on its own from its three rain maps and its own timestamp; no external data,
+no pretrained weights, no look-up across samples. `docs/RULES.md` goes through the competition rules one by
+one and says how the code follows each, including the software used and the AI coding assistance during
+development.
 
 ## Layout
 
-| Path | What it is |
+| Path | Content |
 | --- | --- |
-| `src/fss.py` | Reimplementation of the competition metric (pooled and per-sample variants). |
-| `src/explore.py` | Data statistics and non-learned baselines (persistence, smoothing, dilation). |
-| `src/advect.py` | Optical-flow advection baseline and optional advected input channels. |
-| `src/train_unet.py` | U-Net training: inputs, losses, augmentation, input upscaling, validation, per-epoch probabilities, test inference. |
-| `src/lastk_testprob.py` | Average the test probabilities of a run's last k epochs. |
-| `src/blend.py` | Blend validation probabilities of several runs, tune thresholds, and with `--decode 1` fit the decoder. |
-| `src/fss_decode.py` | Expected-FSS decoder: calibrated probabilities to the rain mask that maximises the expected FSS. |
+| `src/train_unet.py` | Training, validation, per-epoch probabilities and test inference of one network. |
+| `src/fss.py` | The competition metric (pooled over samples, and per sample). |
+| `src/advect.py` | Optical-flow baseline; optional advected input channels (not used by the final members). |
+| `src/blend.py` | Weighted blend of validation probabilities, thresholds, calibration and decoder fit. |
+| `src/fss_decode.py` | Isotonic calibration and the expected-FSS decoder. |
+| `src/context_calib.py` | Neighbourhood-aware calibration, an option of `blend.py` not used by the final submission. |
 | `src/eval_decode.py` | Out-of-sample check of the decoder against thresholds (alternate weeks). |
-| `src/eval_tta.py` | Check of shift test-time augmentation on a saved checkpoint. |
-| `src/make_submission.py` | Blend test probabilities, threshold or decode, write `submission.csv`. |
-| `src/fetch_runs.py` | Download only what the analysis needs from a run-queue session's output (TPU or GPU): each run's best epoch blend. |
-| `build_kernel.sh` | Bundle `fss.py` + `train_unet.py` into one file for a Kaggle GPU kernel. |
-| `build_kernel_pair.py` | Bundle two training runs into one Kaggle kernel that trains them at the same time, one per T4 GPU, for the quota of one session. |
-| `build_kernel_queue.py` | Turn a list of training runs into one Kaggle kernel that trains them side by side for one long session: one run per chip of a TPU v5e-8 machine, or with `--gpu` one run per T4 GPU. |
-| `runs/` | Run lists for `build_kernel_queue.py`, one file per session, with the reason for each group of runs. |
-| `build_molab.py` | Run a GPU run-queue kernel on molab's free 96 GB GPU, several runs side by side, with results uploaded to a private Kaggle dataset after each run. |
-| `molab/` | The molab notebook written by `build_molab.py`: a password box for the Kaggle token and a start button. |
-| `build_colab.py` | Run kernel scripts on a free GPU outside Kaggle: Colab notebooks, the worker notebook, its job queue, and `worker.py` for any Linux GPU machine. |
-| `colab/` | Colab notebooks generated by `build_colab.py`, including the worker. |
-| `kernel/` | Kaggle kernel script and metadata, pushed with `kaggle kernels push`. |
-| `docs/APPROACH.md` | Why the model is built this way, in plain words. |
-| `docs/JOURNAL.md` | Experiment log: every run, its validation score and leaderboard score. |
-| `docs/RULES.md` | Competition rules that constrain the work, and how the code respects them. |
-| `docs/RESEARCH.md` | Literature review of techniques for this task, ranked, with what was implemented. |
-| `docs/HANDBOOK.md` | Machine learning, Kaggle and this project explained for the participant, with talking points for verification. |
-| `data/` | Competition files (git-ignored): `train.npz`, `test.npz`, `sample_submission.csv`. |
-| `outputs/` | Model weights, probability maps, submissions (git-ignored). |
+| `src/twins.py` | Pairs each validation member with its full-data twin's test probabilities. |
+| `src/make_submission.py` | Blends test probabilities, decodes them and writes the submission file. |
+| `src/fetch_runs.py` | Compacts a training session's output: best last-k blend of each run, mean test probabilities. |
+| `src/lastk_testprob.py` | Averages the test probabilities of a run's last k epochs. |
+| `tools/build_kernel.sh` | Bundles the training code into one Kaggle kernel script. |
+| `tools/build_kernel_queue.py` | Turns a run list into one kernel that trains the runs side by side on GPUs or TPU chips. |
+| `tools/build_kernel_pair.py` | Two runs in one Kaggle kernel, one per GPU. |
+| `tools/build_molab.py` | Runs a run-queue kernel on molab (marimo's cloud notebooks) with results uploaded to a private Kaggle dataset. |
+| `runs/` | The run lists of every training session, with the reason for each group of runs. |
+| `final/members.md` | The 58 members of the final submission: settings, sessions, scores. |
+| `final/submission.json` | Member files, weights, calibration tables and mu of the final submission. |
+| `docs/APPROACH.md` | Why the model is built this way. |
+| `docs/RULES.md` | Competition rules and how the code follows them; software and references. |
+| `data/`, `outputs/`, `kernel/` | Competition files, model outputs and generated kernels (git-ignored). |
 
 ## Setup
 
 ```bash
 uv venv -p 3.12 .venv && source .venv/bin/activate
-uv pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+uv pip install -r requirements.txt
 kaggle competitions download -c hackathon-IndabaX-MDG-2026 -f train.npz -p data
 kaggle competitions download -c hackathon-IndabaX-MDG-2026 -f test.npz -p data
-kaggle competitions download -c hackathon-IndabaX-MDG-2026 -f sample_submission.csv -p data
 ```
 
-The Kaggle CLI reads its token from `~/.kaggle/access_token` (Kaggle settings, API Tokens).
+The Kaggle CLI reads its token from `~/.kaggle/access_token`.
 
-## Train on Google Colab (saves Kaggle GPU quota)
+## Reproducing the final submission
 
-Kaggle gives 30 GPU hours per week (`kaggle quota` shows what is left and when it refreshes). Colab's
-free T4 GPU runs the same kernel scripts. The usual way is the worker notebook, which trains a queue of
-jobs one after the other:
+1. **Train the members and their twins.** Each session is a run list in `runs/` (the sessions of the final
+   members are named in `final/members.md`; twins are the `--full` lines with seed + 100). A list becomes one
+   kernel script that trains its runs side by side within a time budget:
 
-1. Queue jobs from kernel folders. This publishes the private dataset `cocofioren/indabax-colab-jobs`:
+   ```bash
+   python tools/build_kernel_queue.py indabax-molab-set9 runs/molab-scratch-set9.txt 10.25 --gpu --runs-per-gpu 2
+   ```
 
-```bash
-python build_colab.py jobs indabax-unetpp-r34-up3-long-s41 indabax-unet-r34-up3-aux
-```
+   On Kaggle: `kaggle kernels push -p kernel/indabax-molab-set9 -t 43200`, then
+   `python src/fetch_runs.py cocofioren/indabax-molab-set9 outputs/molab-set9` once the session ends.
+   On molab: `python tools/build_molab.py indabax-molab-set9 indabax-molab-set9-results` publishes the job
+   to a private Kaggle dataset; the notebook it writes runs the job and uploads the compacted results, fetched
+   with `kaggle datasets download -d cocofioren/indabax-molab-set9-results -p outputs/molab-set9 --unzip`.
+   A single run trains with `python src/train_unet.py <base line> <own settings>`.
 
-2. In Colab, open `colab/indabax-colab-worker.ipynb` (File > Upload notebook the first time, then from
-   Google Drive). Runtime > Change runtime type > T4 GPU.
-3. One time per Google account: open the key icon in the left sidebar, add a secret named
-   `KAGGLE_API_TOKEN` whose value is the Kaggle API token, and switch on notebook access.
-4. Runtime > Run all, and keep the tab open. Jobs whose results already exist are skipped, so after a
-   disconnect, Run all resumes the queue.
-5. Each job's results land in a private Kaggle dataset named after the kernel. Download them with:
+2. **Blend and fit the decoder** on the held-out season (from `src/`):
 
-```bash
-kaggle datasets download -d cocofioren/indabax-colab-unetpp-r34-up3-long-s41 -p outputs/kunetpp41 --unzip
-```
+   ```bash
+   cd src
+   M=$(python -c "import json; c = json.load(open('../final/submission.json')); print(' '.join('../' + m for m in c['members']))")
+   W=$(python -c "import json; print(','.join(map(str, json.load(open('../final/submission.json'))['weights'])))")
+   python blend.py --data ../data --out ../outputs/final.json --decode 1 --mu 0.425,0.375,0.35 --weights $W $M
+   ```
 
-For a single run, `python build_colab.py notebook <kernel-slug>` writes a notebook that runs only that
-kernel. The token never appears in a notebook or a dataset: it is read from the secret at run time.
-Colab has about 12.7 GB of RAM, which is why `train_unet.py` indexes the training arrays instead of
-copying them.
-The free GPU also has a usage limit that Google does not publish (it was reached after about 7 hours
-of T4 time on 21 October). When it is reached the runtime stops, and Run all works again only after
-the limit resets, usually some hours later; the queue resumes where it stopped, minus the job that was cut.
+   `../outputs/final.json` then holds the thresholds, calibration tables and mu of `final/submission.json`.
 
-## Train on Kaggle's TPU (a separate weekly quota)
+3. **Decode the twins' test probabilities** and write the submission:
 
-Kaggle also gives 20 TPU hours a week, apart from the 30 GPU hours (`kaggle quota` shows both, with
-their refresh time). A TPU v5e-8 machine has eight TPU chips. `build_kernel_queue.py` turns a list of runs
-(`runs/*.txt`, in priority order) into one kernel that keeps the eight chips busy: each chip trains one
-run, then takes the next one on the list, as long as that run should end within the session's time
-budget (7.75 hours by default, under Kaggle's 9-hour limit for a TPU session).
+   ```bash
+   python make_submission.py ../outputs/submission.csv ../outputs/final.json $(python twins.py $M)
+   kaggle competitions submit -c hackathon-IndabaX-MDG-2026 -f ../outputs/submission.csv -m "final"
+   ```
 
-```bash
-python build_kernel_queue.py indabax-tpu-scratch-set1 runs/tpu-scratch-set1.txt
-kaggle kernels push -p kernel/indabax-tpu-scratch-set1 -t 32400
-kaggle kernels output cocofioren/indabax-tpu-scratch-set1 -p outputs/tpu-set1 --file-pattern '\.json$'
-```
+Seeds are fixed; GPU kernels and mixed precision keep the runs reproducible to a few 1e-4 of FSS.
 
-Every run gets `--xla 1`: `train_unet.py` then trains on one TPU chip through PyTorch/XLA, and
-`--amp 1` means bfloat16 instead of float16. The launcher also:
+## References
 
-- unpacks the competition arrays once into `.npy` files that every run memory-maps, so the runs share
-  one copy of the 4.3 GB of training data in RAM;
-- installs segmentation-models-pytorch with the installed torch and torch_xla versions pinned, so pip
-  cannot replace the torch build that torch_xla needs;
-- copies each run's useful files to the kernel output as soon as the run ends (with `--keep_epochs 6`
-  only the last six epochs' probabilities are kept), then frees the scratch disk;
-- writes `session.json` (`tpu_session.json` in the first two sessions): device, start, duration, exit
-  code and files of every run;
-- trains the remaining runs one after another on one chip if giving each run its own chip fails.
-
-The output of a full session is several GB, so download it in parts with `--file-pattern` (a regular
-expression on file names): the JSON summaries first, then the files the analysis needs.
-
-Turning a session's output into a submission (validation runs set the decoder, their full-data twins
-predict the test set):
-
-```bash
-python src/fetch_runs.py cocofioren/indabax-tpu-scratch-set1 outputs/tpu-set1
-cd src
-python blend.py --data ../data --out ../outputs/tpu1dec.json --decode 1 --mu 0.425,0.375,0.35 ../outputs/tpu-set1/*_valprob.npy
-python make_submission.py ../outputs/sub_tpu1.csv ../outputs/tpu1dec.json ../outputs/tpu-set1/*_full_*testprob.npy
-```
-
-Why one long session instead of several short ones: only one TPU session may run or wait at a time, and
-each session first waits in Kaggle's queue, because every Kaggle user shares a few TPU machines. Reports
-from October 2026 give waits of 11 to 24 hours. A queued session cannot be cancelled from the command
-line; on the website, the "View Active Events" panel (bottom left) has "Stop Session".
-
-That limit counts batch sessions only. A second session can run interactively, in the notebook editor:
-push the kernel once without an accelerator (`enable_tpu` false: the launcher stops at once without
-`torch_xla`), open it with Edit, choose Session options > Accelerator > TPU v5e-8, and click Run All.
-Interactive sessions wait in a queue too (the editor shows the position: #640 on 22 October), and they
-keep their files only if saved: Save Version > Quick Save, with Advanced Settings > "Always save output
-when creating a Quick Save". `runs/tpu-scratch-set2.txt` is meant for such a session.
-
-### The same run queue on Kaggle's GPUs
-
-With `--gpu`, `build_kernel_queue.py` builds the same launcher for Kaggle's GPU machine
-(`machine_shape` NvidiaTeslaT4, shown as "GPU T4 x2" in the editor): one worker per GPU, each run
-pinned to its GPU with `CUDA_VISIBLE_DEVICES`, no `--xla`, and `--amp 1` meaning float16. The weekly GPU
-quota counts session hours, so two runs side by side cost the hours of one, and a GPU session may last
-12 hours, so the default budget is 10.75 hours. A GPU session starts at once, but its output can only
-be downloaded when the whole session ends: shorter budgets give results sooner.
-
-```bash
-python build_kernel_queue.py indabax-gpu-scratch-set1 runs/gpu-scratch-set1.txt --gpu
-kaggle kernels push -p kernel/indabax-gpu-scratch-set1 -t 43200
-```
-
-At most two GPU sessions run at a time, so two such kernels keep four GPUs busy.
-
-## Train on molab (free 96 GB GPU)
-
-molab (molab.marimo.io) is marimo's free cloud notebook service. Since October 2026 a notebook can have an
-NVIDIA RTX PRO 6000 Blackwell GPU with 96 GB of memory (resources menu > GPUs, then Save and restart),
-next to 4 CPUs and 32 GB of RAM. One U-Net++ run needs a small part of that GPU, so the run queue trains
-three runs side by side on it (`--runs-per-gpu 3`). A molab notebook runs at most 12 hours and stops
-after 90 idle minutes, so its browser tab stays open and the budget is about 10 hours.
-
-```bash
-python build_kernel_queue.py indabax-molab-set1 runs/molab-scratch-set1.txt 10.25 --gpu --runs-per-gpu 3
-python build_molab.py indabax-molab-set1 indabax-molab-set1-results
-```
-
-`build_molab.py` publishes the private dataset `cocofioren/indabax-molab-jobs` (the kernel script, the
-molab worker and `src/fetch_runs.py`) and writes `molab/indabax-molab-worker.py`, a three-cell marimo
-notebook. In molab, the notebook asks for the Kaggle API token in a password box (kept in the session,
-never saved in the notebook), downloads the jobs dataset and starts the worker. The worker downloads the
-competition data, runs the queue (molab runs notebooks as root, so the Kaggle paths work unchanged), and
-after each finished run compacts the output with `src/fetch_runs.py` and uploads it as a new version of
-the private dataset `cocofioren/indabax-molab-set1-results`. Anyone with a molab notebook's URL can open
-it, so the notebook holds no competition code: the code comes from the private dataset at run time.
-
-```bash
-kaggle datasets download -d cocofioren/indabax-molab-set1-results -p outputs/molab-set1 --unzip
-```
-
-To switch the notebook to another session (for example `indabax-molab-set2`), publish its job with
-`build_molab.py`, then use Save and restart in molab's resources menu before pasting the token and
-clicking Start training again. Re-running the cell alone is not enough: the runs of the previous job keep
-training on the GPU in the background.
-
-## Saturn Cloud: tried, no free compute
-
-Saturn Cloud's free trial lists one T4 GPU (instance size T4-XLARGE), but its API refuses to start any
-resource: "You have exceeded the limits applied to your account ... Max of 0 hours of resource usage.
-Upgrade to Pro for more resources!" This holds for both the personal account and the organisation, so
-it cannot train anything without a paid plan (checked on 21 October 2026).
-
-The job queue still carries `worker.py`, the worker as plain Python, for any Linux machine with a GPU
-and the Kaggle API token in the environment variable `KAGGLE_API_TOKEN`. Its whole start command is
-printed by `python -c "import build_colab; print(build_colab.SATURN_COMMAND)"`.
-
-## Reproduce the best submission (public 0.77372, submission 11)
-
-These runs start from ImageNet weights, which the competition rules allowed until 21 October and now
-forbid (see `docs/RULES.md`). They are kept to document the early submissions; the kernel files listed
-here were bundled before `--pretrained` existed and still load ImageNet weights. Final submissions use
-networks trained from random weights.
-
-Eight U-Nets are trained on Kaggle GPUs with the 2022-2023 season held out. Each run saves the test
-probabilities of every epoch and the validation probabilities of its last-k epoch averages.
-
-| Kernel | Arguments after the common ones | Last k | Validation FSS |
-| --- | --- | --- | --- |
-| `indabax-unet-r34-up3` | `--encoder resnet34 --upscale 3 --seed 32` | 5 | 0.7081 |
-| `indabax-unet-r34-up3-s35` | `--encoder resnet34 --upscale 3 --seed 35 --tta 1` | 4 | 0.7066 |
-| `indabax-unet-r34-up4` | `--encoder resnet34 --upscale 4 --seed 34 --tta 1` | 4 | 0.7073 |
-| `indabax-unet-r34-up2` | `--encoder resnet34 --upscale 2 --seed 31` | 5 | 0.7032 |
-| `indabax-unet-r50-up2` | `--encoder resnet50 --upscale 2 --seed 51` | 4 | 0.7040 |
-| `indabax-unet-r34-up3-loss` | `--encoder resnet34 --upscale 3 --csi_w 1 --ms_fss 1 --pos_w 2 --mixup 0.5 --wet_sampling 1 --seed 36 --tta 1` | 6 | 0.7060 |
-| `indabax-unet-r50-up3` | `--encoder resnet50 --upscale 3 --seed 52 --tta 1` | 4 | 0.7082 |
-| `indabax-unet-effb3-up3` | `--encoder efficientnet-b3 --upscale 3 --bs 16 --seed 23 --tta 1` | 5 | 0.7057 |
-
-Common arguments: `--data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working
---threads 4 --save_each --epochs 6 --lr 5e-4 --aug 2 --dropout 0.2`.
-
-```bash
-# 1. build and run one kernel per row (2 GPU kernels at a time on Kaggle)
-./build_kernel.sh "<common arguments> <row arguments>" indabax-unet-r34-up3
-kaggle kernels push -p kernel/indabax-unet-r34-up3
-kaggle kernels status cocofioren/indabax-unet-r34-up3
-kaggle kernels output cocofioren/indabax-unet-r34-up3 -p outputs/kup3
-
-# 2. average the last k epochs of test probabilities, matching the validation file
-python src/lastk_testprob.py outputs/kup3/resnet34_s32 5
-
-# 3. blend the eight runs, calibrate and fit the decoder on the held-out season (run from src/)
-cd src
-python blend.py --data ../data --out ../outputs/blend18dec.json --decode 1 --mu 0.425,0.375,0.35 \
-  ../outputs/kup3/resnet34_s32_last5_valprob.npy ../outputs/kup3s35/resnet34_s35_last4_valprob.npy \
-  ../outputs/kup4/resnet34_s34_last4_valprob.npy ../outputs/kup2/resnet34_s31_last5_valprob.npy \
-  ../outputs/kr50up2/resnet50_s51_last4_valprob.npy ../outputs/kup3loss/resnet34_s36_last6_valprob.npy \
-  ../outputs/kr50up3/resnet50_s52_last4_valprob.npy ../outputs/keffb3up3/efficientnet-b3_s23_last5_valprob.npy
-
-# 4. decode the blended test probabilities and write the submission
-python make_submission.py ../outputs/sub11.csv ../outputs/blend18dec.json ../outputs/blend18dec_testprob.npy
-kaggle competitions submit -c hackathon-IndabaX-MDG-2026 -f ../outputs/sub11.csv -m "sub11"
-```
-
-Without `--mu`, `blend.py` searches mu per lead time (slower, same values). The runs `r34-up2`,
-`r34-up3` and `r50-up2` were built before `--tta` existed and use single predictions.
-
-## Results
-
-See `docs/JOURNAL.md`. Persistence (copy the last input map) scores 0.604 FSS on the held-out season.
-The best single U-Net scores 0.708 with thresholds; eight U-Nets blended and decoded score 0.7655 on
-the held-out season and 0.77372 on the public leaderboard.
+- Roberts, N. M., and Lean, H. W. (2008). Scale-selective verification of rainfall accumulations from
+  high-resolution forecasts of convective events. Monthly Weather Review, 136(1), 78-97.
+- Amell, A., Hee, L., Pfreundschuh, S., and Eriksson, P. (2025). Probabilistic near-real-time retrievals of
+  Rain over Africa using deep learning. Journal of Geophysical Research: Atmospheres, 130, e2025JD044595.
+- Zhou, Z., et al. (2018). UNet++: A nested U-Net architecture for medical image segmentation. DLMIA 2018.
+- Iakubovskii, P. (2019). Segmentation Models Pytorch. https://github.com/qubvel/segmentation_models.pytorch

@@ -1,7 +1,7 @@
 """Download what the analysis needs from a run-queue session's output (TPU or GPU), run by run, so the local
 disk stays small.
 
-A full TPU session leaves about 10 GB on Kaggle (see build_kernel_queue.py). Kept locally:
+A full session leaves about 10 GB on Kaggle (see tools/build_kernel_queue.py). Kept locally:
 - for every validation run: its summary, its best last-k validation blend, stored as uint8 (probability
   x 255: half the size of float16 and finer than the decoder's 1001-step calibration table), and the mean
   test probability of the same k epochs, both under the blend's name (e.g. <tag>_last3_valprob.npy and
