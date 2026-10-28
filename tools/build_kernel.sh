@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Usage: ./build_kernel.sh "<args for train_unet.py>" [kernel-slug]
-# Bundles src/fss.py + src/train_unet.py into kernel/<slug>/<slug>.py with kernel-metadata.json.
+# Usage: tools/build_kernel.sh "<args for train_unet.py>" [kernel-slug]
+# Bundles src/fss.py, src/advect.py and src/train_unet.py into kernel/<slug>/<slug>.py with its kernel-metadata.json,
+# paths relative to the repository root.
 set -e
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 ARGS="$1"; SLUG="${2:-indabax-rain-unet}"
 mkdir -p "kernel/$SLUG"
 python3 - "$ARGS" "$SLUG" <<'PY'

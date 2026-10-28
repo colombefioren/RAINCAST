@@ -3,16 +3,17 @@
 Kaggle's T4 machine has two GPUs and the weekly quota counts session hours, so two runs in one session
 cost the same quota as one run. With a single GPU the runs go one after the other.
 
-Usage: python build_kernel_pair.py <kernel-slug> "<args for run 1>" "<args for run 2>"
+Usage: python tools/build_kernel_pair.py <kernel-slug> "<args for run 1>" "<args for run 2>"
 The two runs must differ in seed or model, because both write to /kaggle/working.
 """
 import json, os, subprocess, sys
 
+os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 slug, runs = sys.argv[1], sys.argv[2:4]
 assert len(runs) == 2, __doc__
 # build_kernel.sh bundles fss.py + train_unet.py into one file; reuse it, then make that file read its
 # arguments from the command line instead of the KERNEL_ARGS line
-subprocess.run(["./build_kernel.sh", runs[0], slug], check=True)
+subprocess.run(["tools/build_kernel.sh", runs[0], slug], check=True)
 path = f"kernel/{slug}/{slug}.py"
 lines = open(path).read().split("\n")
 assert lines[0].startswith("KERNEL_ARGS = ") and "pip" in lines[1]

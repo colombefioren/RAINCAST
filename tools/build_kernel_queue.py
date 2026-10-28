@@ -24,15 +24,17 @@ How the session runs:
   trains within 45 minutes, the remaining runs go one after another on the default device.
 - session.json in the output records every run: device, start, duration, exit code and files kept.
 
-Usage: python build_kernel_queue.py <kernel-slug> <runs-file> [budget-hours] [--gpu] [--runs-per-gpu N]
+Usage: python tools/build_kernel_queue.py <kernel-slug> <runs-file> [budget-hours] [--gpu] [--runs-per-gpu N]
+(paths relative to the repository root; the kernel is written to kernel/<kernel-slug>/)
 The budget defaults to 7.75 hours on TPU and 10.75 hours on GPU. --runs-per-gpu N trains N runs side by side
-on each GPU (default 1), for a GPU much bigger than one run needs, such as molab's 96 GB (build_molab.py).
+on each GPU (default 1), for a GPU much bigger than one run needs, such as molab's 96 GB (tools/build_molab.py).
 The runs file holds a "base:" line with the train_unet.py arguments every run shares, then one run per line
 (its own arguments, in priority order); # starts a comment. Push with -t 32400 for a TPU kernel (Kaggle's
 9-hour TPU limit) or -t 43200 for a GPU kernel (12 hours).
 """
-import json, subprocess, sys
+import json, os, subprocess, sys
 
+os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 gpu = "--gpu" in sys.argv
 argv = [x for x in sys.argv[1:] if x != "--gpu"]
 runs_per_gpu = 1
@@ -242,7 +244,7 @@ log("done:", sum(r["exit_code"] == 0 for r in report), "of", len(RUNS), "runs fi
 '''
 # build_kernel.sh bundles fss.py, advect.py and train_unet.py into one file; reuse it, then make that file
 # read its arguments from the command line instead of the KERNEL_ARGS line
-subprocess.run(["./build_kernel.sh", " ".join(runs[0]), slug], check=True)
+subprocess.run(["tools/build_kernel.sh", " ".join(runs[0]), slug], check=True)
 path = f"kernel/{slug}/{slug}.py"
 lines = open(path).read().split("\n")
 assert lines[0].startswith("KERNEL_ARGS = ") and "pip" in lines[1]

@@ -2,9 +2,9 @@
 (molab.marimo.io): its RTX PRO 6000 Blackwell GPU (96 GB) trains several runs side by side, outside Kaggle's
 GPU quota.
 
-Usage: python build_molab.py <kernel-slug> <results-dataset-name>
-e.g.   python build_kernel_queue.py indabax-molab-set1 runs/molab-scratch-set1.txt 10.25 --gpu --runs-per-gpu 3
-       python build_molab.py indabax-molab-set1 indabax-molab-set1-results
+Usage: python tools/build_molab.py <kernel-slug> <results-dataset-name>
+e.g.   python tools/build_kernel_queue.py indabax-molab-set1 runs/molab-scratch-set1.txt 10.25 --gpu --runs-per-gpu 3
+       python tools/build_molab.py indabax-molab-set1 indabax-molab-set1-results
 
 It publishes the private Kaggle dataset cocofioren/indabax-molab-jobs (the kernel script as job.py, job.json,
 molab_worker.py and src/fetch_runs.py) and writes the molab notebook molab/indabax-molab-worker.py. In molab:
@@ -27,6 +27,7 @@ not listed anywhere), so the notebook holds no competition code: the code comes 
 """
 import json, os, shutil, subprocess, sys, tempfile
 
+os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 JOBS = "cocofioren/indabax-molab-jobs"
 KAGGLE = os.environ.get("KAGGLE", "kaggle")
 
@@ -149,7 +150,7 @@ if __name__ == "__main__":
 slug, results = sys.argv[1], sys.argv[2]
 script = f"kernel/{slug}/{slug}.py"
 src = open(script).read()
-assert "\nGPU = True" in src and "RUNS_PER_GPU" in src, f"{script}: build it with build_kernel_queue.py --gpu first"
+assert "\nGPU = True" in src and "RUNS_PER_GPU" in src, f"{script}: build it with tools/build_kernel_queue.py --gpu first"
 compile(WORKER, "molab_worker.py", "exec"); compile(NOTEBOOK, "indabax-molab-worker.py", "exec")
 os.makedirs("molab", exist_ok=True)
 open("molab/indabax-molab-worker.py", "w").write(NOTEBOOK)
