@@ -7,17 +7,17 @@
 # 2x upscale), two cheap untried ones (batch 8, densenet121), and last the twins of the two strongest learning-rate
 # members. Every pair that reaches 0.7135 gets twins in a third session.
 base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
---keep_epochs 9 --seed 1665
---keep_epochs 9 --seed 1666
+--keep_epochs 9 --seed 1741
+--keep_epochs 9 --seed 1742
 --encoder resnet50 --seed 1659
 --encoder resnet50 --seed 1660
 --arch DeepLabV3Plus --seed 1661
 --arch DeepLabV3Plus --seed 1662
 --upscale 2 --seed 1663
 --upscale 2 --seed 1664
---bs 8 --seed 1671
---bs 8 --seed 1672
---encoder densenet121 --seed 1667
---encoder densenet121 --seed 1668
+--bs 8 --seed 1745
+--bs 8 --seed 1746
+--encoder densenet121 --seed 1743
+--encoder densenet121 --seed 1744
 --lr 2e-3 --seed 1734 --full
 --lr 2e-3 --seed 1736 --full
