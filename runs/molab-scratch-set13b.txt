@@ -1,0 +1,23 @@
+# Thirteenth session, part b (Wednesday 28 October, afternoon and night, after the morning sandbox was reclaimed
+# with four pairs done). The morning's verdicts: scse attention ties in the blend (0.7140, 0.7128), zoom augmentation
+# sits under the band (0.7128, 0.7131), the FPN decoder loses alone and in the blend (0.7063, 0.7051), and 20 epochs
+# with the last 8 averaged lose (0.7113, 0.7105) although the average keeps improving with every epoch added. That
+# last point is the first run: the base recipe with its last 9 epochs kept, to see whether averaging 7 to 9 epochs
+# beats the last 6 that every member uses. Then the settings the morning never reached (resnet50, DeepLabV3Plus,
+# 2x upscale), two cheap untried ones (batch 8, densenet121), and last the twins of the two strongest learning-rate
+# members. Every pair that reaches 0.7135 gets twins in a third session.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--keep_epochs 9 --seed 1665
+--keep_epochs 9 --seed 1666
+--encoder resnet50 --seed 1659
+--encoder resnet50 --seed 1660
+--arch DeepLabV3Plus --seed 1661
+--arch DeepLabV3Plus --seed 1662
+--upscale 2 --seed 1663
+--upscale 2 --seed 1664
+--bs 8 --seed 1671
+--bs 8 --seed 1672
+--encoder densenet121 --seed 1667
+--encoder densenet121 --seed 1668
+--lr 2e-3 --seed 1734 --full
+--lr 2e-3 --seed 1736 --full
