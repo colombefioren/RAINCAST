@@ -78,8 +78,7 @@ def objective(M, p, mu, chunk=512):
 def decode_best(p, mu, inits=(0.5, 0.65), anneal=True, sweeps=6):
     """decode() from several starts, keeping for each sample the mask with the highest objective: thresholds of p
     at each of inits, and (anneal) ICM at 0.7 mu continued at mu. ICM finds local optima, and the objective tracks
-    the pooled FSS closely: on the validation season of blend32cw2 this gave +0.0003 / +0.0002 / +0.0001 per lead
-    over the single start at 0.5, for three times the decoding time."""
+    the pooled FSS closely, so the extra starts gain a few 1e-4 of FSS per lead for three times the decoding time."""
     masks = [decode(p, mu, sweeps, thr) for thr in inits]
     if anneal: masks.append(decode(p, mu, sweeps + 2, init=decode(p, 0.7 * mu, 4)))
     J = np.stack([objective(M, p, mu) for M in masks])

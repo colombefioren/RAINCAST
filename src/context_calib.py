@@ -10,9 +10,9 @@ day of the lead time. Every feature of a sample comes from its own maps and time
 independent of each other.
 
 Fitted per lead time on the validation season (a pixel sample: pixels with some rain chance at rate 0.15, dry
-pixels at rate 0.0075 weighted by 20), starting from the isotonic answer. On alternate validation days (fit on one
-half, score on the other) it raised the decoded FSS of blend32cw2 by about 0.0010 (0.0010, 0.0013 and 0.0006 per
-lead; 0.0007 with only the first seven features)."""
+pixels at rate 0.0075 weighted by 20), starting from the isotonic answer. Checked on alternate validation days (fit
+on one half, score on the other), it adds about 0.001 of decoded FSS to a large blend; the final submission does not
+use it (blend.py --context 0, the default)."""
 import numpy as np, torch
 from scipy.ndimage import uniform_filter, maximum_filter
 from fss_decode import calibrate

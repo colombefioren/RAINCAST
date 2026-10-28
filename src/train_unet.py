@@ -13,8 +13,8 @@ p.add_argument("--out", default="outputs")
 p.add_argument("--encoder", default="resnet18")
 p.add_argument("--arch", default="Unet", choices=["Unet", "UnetPlusPlus", "FPN", "DeepLabV3Plus"], help="segmentation-models-pytorch decoder")
 p.add_argument("--attention", default="", choices=["", "scse"], help="scse: squeeze-and-excitation attention blocks in the Unet / UnetPlusPlus decoder")
-p.add_argument("--pretrained", type=int, default=0, help="1: start the encoder from ImageNet weights. The rules forbid weights pretrained "
-               "outside the competition data since they changed after 20 October, so this only reproduces earlier runs")
+p.add_argument("--pretrained", type=int, default=0, help="1: start the encoder from ImageNet weights, which the competition rules forbid "
+               "since 21 October 2026; kept only to reproduce the submissions made before that date")
 p.add_argument("--epochs", type=int, default=8)
 p.add_argument("--bs", type=int, default=32)
 p.add_argument("--lr", type=float, default=1e-3)
