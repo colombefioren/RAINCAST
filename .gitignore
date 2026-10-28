@@ -10,3 +10,6 @@ __pycache__/
 *.zip
 .env
 .env.*
+kernel/
+colab/
+molab/
