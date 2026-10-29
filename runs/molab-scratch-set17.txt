@@ -1,0 +1,16 @@
+# Seventeenth session (Thursday 29 October, evening, second sandbox after session 15 finished its twelve tests).
+# Six more member-and-twin pairs of the strongest recipe, learning rate 2e-3 with nine epochs kept, so that the
+# final blend can draw on the largest pool of twins of its best family.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--lr 2e-3 --keep_epochs 9 --seed 1865
+--lr 2e-3 --keep_epochs 9 --seed 1965 --full
+--lr 2e-3 --keep_epochs 9 --seed 1866
+--lr 2e-3 --keep_epochs 9 --seed 1966 --full
+--lr 2e-3 --keep_epochs 9 --seed 1867
+--lr 2e-3 --keep_epochs 9 --seed 1967 --full
+--lr 2e-3 --keep_epochs 9 --seed 1868
+--lr 2e-3 --keep_epochs 9 --seed 1968 --full
+--lr 2e-3 --keep_epochs 9 --seed 1869
+--lr 2e-3 --keep_epochs 9 --seed 1969 --full
+--lr 2e-3 --keep_epochs 9 --seed 1870
+--lr 2e-3 --keep_epochs 9 --seed 1970 --full

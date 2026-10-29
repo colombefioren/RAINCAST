@@ -1,0 +1,19 @@
+# Sixteenth session, part b (Thursday 29 October, 16:00, replacing part a after its two lost pairs were retrained).
+# Session 15 verdicts under float16: UPerNet 0.7115/0.7090, Segformer 0.7093/0.7095, PAN 0.7043/0.7046, Linknet
+# 0.7106/0.7097 all lose cleanly, so they are not repeated; MAnet (NaN) and ConvNeXt-tiny (0.13, diverged) failed
+# numerically, so only those two get a float32 rerun. The rest of the sandbox goes to the strongest recipe,
+# learning rate 2e-3 with nine epochs kept (session 13b: averaging the last eight epochs beats the last six on
+# single runs), as member-and-twin pairs.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--amp 0 --arch Unet --encoder tu-convnext_tiny --seed 1855
+--amp 0 --arch Unet --encoder tu-convnext_tiny --seed 1856
+--amp 0 --arch MAnet --seed 1857
+--amp 0 --arch MAnet --seed 1858
+--lr 2e-3 --keep_epochs 9 --seed 1861
+--lr 2e-3 --keep_epochs 9 --seed 1961 --full
+--lr 2e-3 --keep_epochs 9 --seed 1862
+--lr 2e-3 --keep_epochs 9 --seed 1962 --full
+--lr 2e-3 --keep_epochs 9 --seed 1863
+--lr 2e-3 --keep_epochs 9 --seed 1963 --full
+--lr 2e-3 --keep_epochs 9 --seed 1864
+--lr 2e-3 --keep_epochs 9 --seed 1964 --full
