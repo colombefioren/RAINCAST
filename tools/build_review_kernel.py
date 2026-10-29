@@ -6,8 +6,8 @@ Usage (from the repository root, with the final submission's files under outputs
 
 Writes:
   outputs/review/code/      the tracked files of the repository at HEAD (dataset cocofioren/indabax-rainfall-code)
-  outputs/review/members/   the 58 members' validation probabilities and their twins' test probabilities, compressed,
-                            with index.json and the submitted file (dataset cocofioren/indabax-rainfall-members)
+  outputs/review/members/   the 58 members' validation and test probabilities and their twins' test probabilities,
+                            compressed, with index.json and the submitted file (dataset cocofioren/indabax-rainfall-members)
   kernel/indabax-rainfall-reproduction/   the notebook and its kernel-metadata.json
 
 Publish with:
@@ -42,10 +42,10 @@ mem_dir = "outputs/review/members"
 os.makedirs(mem_dir, exist_ok=True)
 twins = subprocess.run([sys.executable, "twins.py"] + ["../" + m for m in final["members"]],
                        capture_output=True, text=True, cwd="src", check=True).stdout.split()
-index = {"members": [], "twins": [], "weights": final["weights"], "mu": final["decode"]["mu"]}
+index = {"members": [], "members_test": [], "twins": [], "weights": final["weights"], "mu": final["decode"]["mu"]}
 import numpy as np
 for m, t in zip(final["members"], twins):
-    for key, f in (("members", m), ("twins", t[3:])):
+    for key, f in (("members", m), ("members_test", m.replace("_valprob", "_testprob")), ("twins", t[3:])):
         name = os.path.basename(f)[:-4]
         dst = f"{mem_dir}/{name}.npz"
         if not os.path.exists(dst): np.savez_compressed(dst, prob=np.load(f))
@@ -80,9 +80,9 @@ Inputs of this notebook:
 
 - `{OWNER}/{CODE}`: the repository (training, blend, decoder, submission scripts; `README.md`, `docs/APPROACH.md`,
   `docs/RULES.md`, `final/members.md`, the run lists of every training session in `runs/`).
-- `{OWNER}/{MEMBERS}`: for each of the 58 members, its validation probability map (mean of its last epochs on
-  the held-out season, December 2022 to March 2023) and the test probability map of its full-data twin (same
-  settings, seed + 100, trained on every season), as written by `src/train_unet.py` and compacted by
+- `{OWNER}/{MEMBERS}`: for each of the 58 members, its validation and test probability maps (mean of its last
+  epochs; the validation season is December 2022 to March 2023) and the test probability map of its full-data
+  twin (same settings, seed + 100, trained on every season), as written by `src/train_unet.py` and compacted by
   `src/fetch_runs.py`; `submission.csv` is the file that was submitted.
 - the competition data.
 
@@ -163,7 +163,7 @@ py("""
 import numpy as np
 index = json.load(open(f"{MEMBERS}/index.json"))
 os.makedirs("/kaggle/tmp/members", exist_ok=True)
-for name in index["members"] + index["twins"]:
+for name in index["members"] + index["members_test"] + index["twins"]:
     np.save(f"/kaggle/tmp/members/{name[:-4]}.npy", np.load(f"{MEMBERS}/{name}")["prob"])
 members = [f"/kaggle/tmp/members/{m[:-4]}.npy" for m in index["members"]]
 twins = [f"/kaggle/tmp/members/{t[:-4]}.npy" for t in index["twins"]]
@@ -172,8 +172,7 @@ for f in ("train.npz", "test.npz"):
     if not os.path.exists(f"/kaggle/tmp/data/{f}"): os.symlink(f"{DATA}/{f}", f"/kaggle/tmp/data/{f}")
 cmd = [sys.executable, "blend.py", "--data", "/kaggle/tmp/data", "--out", "/kaggle/working/final.json", "--decode", "1",
        "--mu", ",".join(map(str, index["mu"])), "--weights", ",".join(map(str, index["weights"]))] + members
-out = subprocess.run(cmd, capture_output=True, text=True, check=True).stdout
-print(out[-2500:])
+subprocess.run(cmd, check=True)
 final = json.load(open("/kaggle/working/final.json")); shipped = json.load(open("../final/submission.json"))
 print("decoded validation FSS", round(final["val_fss_decoded"], 6), "| final/submission.json", shipped["validation_fss_decoded"])
 """),
