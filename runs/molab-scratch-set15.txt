@@ -1,0 +1,18 @@
+# Fifteenth session (Thursday 29 October, afternoon, on the fourteenth session's sandbox). The last untried decoders
+# and one untried encoder family, two seeds each, as single-model tests against the 0.7140 to 0.7150 band of the
+# U-Net++ resnet34 members: MAnet (multi-scale attention decoder), UPerNet (pyramid pooling decoder), Segformer with
+# a MiT-B2 transformer encoder from random weights, PAN, Linknet, and a plain U-Net on a ConvNeXt-tiny encoder from
+# timm. Any test at or above 0.7145 gets member-and-twin pairs in the overnight session.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--arch MAnet --seed 1831
+--arch MAnet --seed 1832
+--arch UPerNet --seed 1833
+--arch UPerNet --seed 1834
+--arch Segformer --encoder mit_b2 --seed 1835
+--arch Segformer --encoder mit_b2 --seed 1836
+--arch PAN --seed 1837
+--arch PAN --seed 1838
+--arch Unet --encoder tu-convnext_tiny --seed 1839
+--arch Unet --encoder tu-convnext_tiny --seed 1840
+--arch Linknet --seed 1841
+--arch Linknet --seed 1842
