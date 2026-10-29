@@ -2,7 +2,7 @@
 (molab.marimo.io): its RTX PRO 6000 Blackwell GPU (96 GB) trains several runs side by side, outside Kaggle's
 GPU quota.
 
-Usage: python tools/build_molab.py <kernel-slug> <results-dataset-name>
+Usage: python tools/build_molab.py <kernel-slug> <results-dataset-name> [jobs-dataset-name]
 e.g.   python tools/build_kernel_queue.py indabax-molab-set1 runs/molab-scratch-set1.txt 10.25 --gpu --runs-per-gpu 3
        python tools/build_molab.py indabax-molab-set1 indabax-molab-set1-results
 
@@ -28,7 +28,7 @@ not listed anywhere), so the notebook holds no competition code: the code comes 
 import json, os, shutil, subprocess, sys, tempfile
 
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-JOBS = "cocofioren/indabax-molab-jobs"
+JOBS = "cocofioren/" + (sys.argv[3] if len(sys.argv) > 3 else "indabax-molab-jobs")
 KAGGLE = os.environ.get("KAGGLE", "kaggle")
 
 WORKER = r'''"""molab side of build_molab.py: download the data, run job.py, upload compact results after each run."""
@@ -108,7 +108,7 @@ upload("final")
 print("worker done, exit code", p.returncode, flush=True)
 '''
 
-NOTEBOOK = r'''import marimo
+NOTEBOOK_TEMPLATE = r'''import marimo
 
 __generated_with = "0.17.0"
 app = marimo.App(width="medium")
@@ -136,7 +136,7 @@ def _(mo, start, token):
     kaggle_dir.mkdir(exist_ok=True)
     (kaggle_dir / "access_token").write_text(token.value.strip())
     os.chmod(kaggle_dir / "access_token", 0o600)
-    cmd = "python -m pip -q install -U kaggle && mkdir -p /kaggle/jobs && for f in job.py job.json molab_worker.py fetch_runs.py; do kaggle datasets download -d cocofioren/indabax-molab-jobs -f $f -p /kaggle/jobs -o -q || exit 1; done && python -u /kaggle/jobs/molab_worker.py"
+    cmd = "python -m pip -q install -U kaggle && mkdir -p /kaggle/jobs && for f in job.py job.json molab_worker.py fetch_runs.py; do kaggle datasets download -d JOBS_DATASET -f $f -p /kaggle/jobs -o -q || exit 1; done && python -u /kaggle/jobs/molab_worker.py"
     proc = subprocess.Popen(cmd, shell=True, env=dict(os.environ, KAGGLE_API_TOKEN=token.value.strip()), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     for line in proc.stdout:
         print(line, end="", flush=True)
@@ -151,6 +151,7 @@ slug, results = sys.argv[1], sys.argv[2]
 script = f"kernel/{slug}/{slug}.py"
 src = open(script).read()
 assert "\nGPU = True" in src and "RUNS_PER_GPU" in src, f"{script}: build it with tools/build_kernel_queue.py --gpu first"
+NOTEBOOK = NOTEBOOK_TEMPLATE.replace("JOBS_DATASET", JOBS)
 compile(WORKER, "molab_worker.py", "exec"); compile(NOTEBOOK, "indabax-molab-worker.py", "exec")
 os.makedirs("molab", exist_ok=True)
 open("molab/indabax-molab-worker.py", "w").write(NOTEBOOK)
@@ -158,7 +159,7 @@ with tempfile.TemporaryDirectory() as d:
     shutil.copy(script, f"{d}/job.py"); shutil.copy("src/fetch_runs.py", d)
     open(f"{d}/molab_worker.py", "w").write(WORKER)
     json.dump({"slug": slug, "results": results}, open(f"{d}/job.json", "w"))
-    json.dump({"title": "indabax-molab-jobs", "id": JOBS, "licenses": [{"name": "CC0-1.0"}]}, open(f"{d}/dataset-metadata.json", "w"))
+    json.dump({"title": JOBS.split("/")[1], "id": JOBS, "licenses": [{"name": "CC0-1.0"}]}, open(f"{d}/dataset-metadata.json", "w"))
     exists = "ready" in subprocess.run([KAGGLE, "datasets", "status", JOBS], capture_output=True, text=True).stdout.lower()
     cmd = ["version", "-p", d, "-m", f"{slug} to {results}"] if exists else ["create", "-p", d]  # create: private by default
     subprocess.run([KAGGLE, "datasets"] + cmd + ["-q"], check=True)
