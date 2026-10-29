@@ -11,7 +11,7 @@ p = argparse.ArgumentParser()
 p.add_argument("--data", required=True)
 p.add_argument("--out", default="outputs")
 p.add_argument("--encoder", default="resnet18")
-p.add_argument("--arch", default="Unet", choices=["Unet", "UnetPlusPlus", "FPN", "DeepLabV3Plus"], help="segmentation-models-pytorch decoder")
+p.add_argument("--arch", default="Unet", choices=["Unet", "UnetPlusPlus", "FPN", "DeepLabV3Plus", "MAnet", "PAN", "Linknet", "UPerNet", "Segformer"], help="segmentation-models-pytorch decoder")
 p.add_argument("--attention", default="", choices=["", "scse"], help="scse: squeeze-and-excitation attention blocks in the Unet / UnetPlusPlus decoder")
 p.add_argument("--pretrained", type=int, default=0, help="1: start the encoder from ImageNet weights, which the competition rules forbid "
                "since 21 October 2026; kept only to reproduce the submissions made before that date")
