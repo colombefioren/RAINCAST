@@ -1,0 +1,22 @@
+# Sixteenth session (Thursday 29 October, afternoon, on the first sandbox after the fourteenth session restarted by
+# accident at 13:43 and lost its last two pairs). First those two pairs again (base recipe and learning rate 2e-3),
+# then the fifteenth session's untried families once more without mixed precision: the MAnet test of session 15
+# diverged to NaN from the first epoch under float16, so every family here runs in float32 (--amp 0, about twice
+# slower), two seeds each. MAnet comes last.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--seed 1823
+--seed 1923 --full
+--lr 2e-3 --seed 1824
+--lr 2e-3 --seed 1924 --full
+--amp 0 --arch UPerNet --seed 1843
+--amp 0 --arch UPerNet --seed 1844
+--amp 0 --arch Segformer --encoder mit_b2 --seed 1845
+--amp 0 --arch Segformer --encoder mit_b2 --seed 1846
+--amp 0 --arch PAN --seed 1847
+--amp 0 --arch PAN --seed 1848
+--amp 0 --arch Unet --encoder tu-convnext_tiny --seed 1849
+--amp 0 --arch Unet --encoder tu-convnext_tiny --seed 1850
+--amp 0 --arch Linknet --seed 1851
+--amp 0 --arch Linknet --seed 1852
+--amp 0 --arch MAnet --seed 1853
+--amp 0 --arch MAnet --seed 1854
