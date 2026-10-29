@@ -85,6 +85,7 @@ development.
 | `tools/build_kernel_queue.py` | Turns a run list into one kernel that trains the runs side by side on GPUs or TPU chips. |
 | `tools/build_kernel_pair.py` | Two runs in one Kaggle kernel, one per GPU. |
 | `tools/build_molab.py` | Runs a run-queue kernel on molab (marimo's cloud notebooks) with results uploaded to a private Kaggle dataset. |
+| `tools/build_review_kernel.py` | Builds the code-review package: the Kaggle notebook that reproduces the final submission and the two datasets it reads (code, members' probability maps). |
 | `runs/` | The run lists of every training session, with the reason for each group of runs. |
 | `final/members.md` | The 58 members of the final submission: settings, sessions, scores. |
 | `final/submission.json` | Member files, weights, calibration tables and mu of the final submission. |
