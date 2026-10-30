@@ -40,7 +40,7 @@ re-reading the Rules page.
 6. The two final submissions were selected by hand on Kaggle on 30 October: submission 40 (public 0.78384)
    and submission 43 (public 0.78357). Both blend only networks trained from random weights after
    21 October (`final/members.md` names each member's training session and seed; the earliest session,
-   `molab-set1`, started on 22 October). Leaving the choice to Kaggle would have been wrong on the other
+   `molab-set1`, started on 23 October). Leaving the choice to Kaggle would have been wrong on the other
    side: Kaggle picks the best public scores, and the ImageNet-based submissions are among them.
 
 **How to verify.** `final/submission.json` lists the 58 member files; every member comes from a session
