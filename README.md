@@ -2,8 +2,8 @@
 
 # RAINCAST
 
-**Rainfall nowcasting from satellite rain maps.**
-Three hourly maps in, the next three hours out.
+**Where will it rain over Madagascar in the next three hours?**
+Deep-learning rain prediction from satellite rain maps: three hourly maps in, the next three hours out.
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
