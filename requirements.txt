@@ -8,3 +8,4 @@ segmentation-models-pytorch
 timm
 opencv-python-headless
 kaggle
+matplotlib
