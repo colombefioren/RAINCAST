@@ -1,6 +1,6 @@
 # Training runs for the second Kaggle GPU session of the new weekly quota (Saturday 24 October, from
 # 03:00 Madagascar time), built with build_kernel_queue.py --gpu: two T4 GPUs, one run each, in priority order.
-# The molab sessions of 23 October showed that every from-scratch recipe tried lands at the same validation
+# The cloud sessions of 23 October showed that every from-scratch recipe tried lands at the same validation
 # level (last-k average with tuned thresholds: 0.710 to 0.712 for U-Net++ resnet34 at 12 to 16 epochs, for the
 # resnet50 encoder and for batch 32 with learning rate 2e-3; 0.709 for the plain U-Net), and that schedules
 # past 16 epochs overfit. So these sessions add ensemble members, not new recipes: validation and full-data

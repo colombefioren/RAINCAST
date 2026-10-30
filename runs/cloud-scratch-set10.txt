@@ -1,4 +1,4 @@
-# Tenth molab session (26 to 27 October): twelve single-model tests on the out-of-fold climatology recipe
+# Tenth cloud session (26 to 27 October): twelve single-model tests on the out-of-fold climatology recipe
 # (--clim 1 --clim_oof 1, 14 epochs), after the ninth session's 20-epoch and resnet50 tests lost 0.002 to 0.005:
 # regularisation (weight decay 0.05, dropout 0.3, both), a shorter 12-epoch schedule, the loss variants never tried
 # from random weights (multi-scale FSS, auxiliary regression head, soft CSI, positive weight 4), wet sampling,

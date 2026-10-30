@@ -1,5 +1,5 @@
-# Rest of the fifth molab session (24 October, evening), climatology runs only. The molab sandbox of
-# indabax-molab-set5 stopped between 18:48 and 20:42 Madagascar time, with no laptop suspend in the system log,
+# Rest of the fifth cloud session (24 October, evening), climatology runs only. The cloud sandbox of
+# indabax-cloud-set5 stopped between 18:48 and 20:42 Madagascar time, with no laptop suspend in the system log,
 # after its first three runs had finished and uploaded (climatology validation runs s1203 to s1205), probably out
 # of memory once the advection runs started: each held its 2.1 GB of advected maps about twice (the array and
 # copies of its training and validation rows) in a sandbox of 32 GB (train_unet.py now shares one memory-mapped

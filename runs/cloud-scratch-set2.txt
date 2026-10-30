@@ -1,5 +1,5 @@
-# Second molab session (23 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started with
-# build_molab.py. The first molab run (s91, 24 epochs) overfitted: validation FSS at threshold 0.5 peaked at
+# Second cloud session (23 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started with
+# build_cloud_job.py. The first cloud run (s91, 24 epochs) overfitted: validation FSS at threshold 0.5 peaked at
 # epoch 12 (0.7065) and fell to 0.691 by epoch 23 while the training loss kept dropping, so its last-6 blend
 # decoded to 0.7478, below the 8-epoch s60 (0.7594). This session tests the two fixes side by side:
 # - shorter schedules with the same recipe (12 and 16 epochs);

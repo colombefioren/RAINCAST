@@ -1,5 +1,5 @@
-# Fourth molab session (24 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started with
-# build_molab.py. Every U-Net and U-Net++ recipe trained from random weights has settled at 0.709 to 0.713 (last-k
+# Fourth cloud session (24 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started with
+# build_cloud_job.py. Every U-Net and U-Net++ recipe trained from random weights has settled at 0.709 to 0.713 (last-k
 # average, tuned thresholds), and the 31-run blend gains almost nothing per extra seed of them. This session first
 # tests decoders the blend has not seen yet, for diversity more than for a better single model:
 # - FPN and DeepLabV3+ with the resnet34 encoder (12 epochs), at the usual 3x upscaling and at 4x, where their

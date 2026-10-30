@@ -1,5 +1,5 @@
-# Third molab session (23 and 24 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started
-# with build_molab.py. Every plain 12- to 16-epoch U-Net++ of the second session landed at 0.710 to 0.711 (last-k
+# Third cloud session (23 and 24 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started
+# with build_cloud_job.py. Every plain 12- to 16-epoch U-Net++ of the second session landed at 0.710 to 0.711 (last-k
 # average, tuned thresholds) and the plain U-Net at 0.7095 in a quarter of the time, so more seeds of them add
 # little on their own. This session first tests four ways to a better single model from random weights, each
 # against that 0.710 to 0.711 band:

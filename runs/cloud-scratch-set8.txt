@@ -1,4 +1,4 @@
-# Eighth molab session (25 October): cross-season fold models. Plain 14-epoch U-Net++ runs that hold out one of
+# Eighth cloud session (25 October): cross-season fold models. Plain 14-epoch U-Net++ runs that hold out one of
 # the three other training seasons (--val_season 2019, 2020 or 2021) instead of December 2022 to March 2023, six
 # seeds per season, seasons interleaved so that a cut session still covers all three. Their validation
 # probabilities are out of fold for those seasons, which gives (1) calibration and decoder settings fitted on four

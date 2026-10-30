@@ -1,4 +1,4 @@
-# Seventh molab session (25 October): U-Net++ climatology runs whose training samples read out-of-fold tables
+# Seventh cloud session (25 October): U-Net++ climatology runs whose training samples read out-of-fold tables
 # (--clim_oof 1: counted without the sample's own season, as the validation and test samples' tables are). The
 # first storm start run of the sixth session (s1402) scored 0.7065 against 0.7111 to 0.7122 for the frequency
 # climatology runs: its per-pixel persistence tables count few storms, so on the training samples they carry the

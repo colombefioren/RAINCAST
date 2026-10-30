@@ -1,4 +1,4 @@
-# Ninth molab session (25 to 26 October): six single-model tests first, then more out-of-fold frequency climatology
+# Ninth cloud session (25 to 26 October): six single-model tests first, then more out-of-fold frequency climatology
 # runs (--clim 1 --clim_oof 1), the recipe of the best single runs so far (s1602 0.7138, s1603 0.7127, s1601 0.7117:
 # about +0.001 per run over the leaky climatology runs), with the full-data twin of each, as blend members for the
 # final ensemble. The tests, validation runs without twins so that the next session trains twins of the winners

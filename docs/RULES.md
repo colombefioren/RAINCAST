@@ -40,11 +40,11 @@ re-reading the Rules page.
 6. The two final submissions were selected by hand on Kaggle on 30 October: submission 40 (public 0.78384)
    and submission 43 (public 0.78357). Both blend only networks trained from random weights after
    21 October (`final/members.md` names each member's training session and seed; the earliest session,
-   `molab-set1`, started on 23 October). Leaving the choice to Kaggle would have been wrong on the other
+   `cloud-set1`, started on 23 October). Leaving the choice to Kaggle would have been wrong on the other
    side: Kaggle picks the best public scores, and the ImageNet-based submissions are among them.
 
 **How to verify.** `final/submission.json` lists the 58 member files; every member comes from a session
-in `runs/molab-scratch-set*.txt` or `runs/gpu-*.txt`, whose base lines never set `--pretrained`.
+in `runs/cloud-scratch-set*.txt` or `runs/gpu-*.txt`, whose base lines never set `--pretrained`.
 The reproduction notebook trains one member and its twin with the same command and gets the same scores.
 
 ## Rules and how the code follows them
@@ -77,7 +77,7 @@ The reproduction notebook trains one member and its twin with the same command a
 | PyTorch | Training and inference | BSD-3-Clause |
 | segmentation-models-pytorch (with timm) | U-Net and U-Net++ architectures, built with random weights | MIT, Apache-2.0 |
 | scikit-learn | Isotonic calibration in the decoder | BSD-3-Clause |
-| Kaggle Notebooks, molab (marimo) | GPU sessions for training | service terms |
+| Kaggle Notebooks and a cloud GPU sandbox (RTX Pro 6000) | GPU sessions for training | service terms |
 | Kaggle API client | Data download, kernel runs, submissions | Apache-2.0 |
 | Claude (Anthropic) | AI assistant used during development; every script was reviewed and run by the participant | service terms |
 

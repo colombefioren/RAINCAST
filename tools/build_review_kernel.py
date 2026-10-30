@@ -26,7 +26,7 @@ OWNER = "cocofioren"
 CODE, MEMBERS, KERNEL = "indabax-rainfall-code", "indabax-rainfall-members", "indabax-rainfall-reproduction"
 COMPETITION = "hackathon-IndabaX-MDG-2026"
 SUBMITTED = "outputs/sub40_blend41csi17_twins_decoded.csv"  # submission 40, public leaderboard 0.78384
-LIVE_MEMBER = ("runs/molab-scratch-set11b.txt", 1685)  # the member trained live in the notebook, with its twin 1785
+LIVE_MEMBER = ("runs/cloud-scratch-set11b.txt", 1685)  # the member trained live in the notebook, with its twin 1785
 
 final = json.load(open("final/submission.json"))
 
@@ -63,7 +63,7 @@ base = next(l for l in lines if l.startswith("base:"))[5:].strip()
 own = next(l for l in lines if l.endswith(f"--seed {seed}"))
 twin_own = f"{own} --full".replace(f"--seed {seed}", f"--seed {seed + 100}")
 member_tag = f"unetplusplus_clim_oof_resnet34_s{seed}"
-member_json = json.load(open(f"outputs/molab-set11b/{member_tag}.json"))
+member_json = json.load(open(f"outputs/cloud-set11b/{member_tag}.json"))
 
 md = lambda s: {"cell_type": "markdown", "metadata": {}, "source": s.strip("\n")}
 py = lambda s: {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": s.strip("\n")}

@@ -1,4 +1,4 @@
-# Thirteenth molab session (Wednesday 28 October, the last full day before the deadline on Thursday at 12:00).
+# Thirteenth cloud session (Wednesday 28 October, the last full day before the deadline on Thursday at 12:00).
 # The blend is saturated for members of the known families: the two learning-rate 2e-3 members of session 12b
 # added +0.00001, the weight-4 and drop-two tests tied or lost, so more seeds of known recipes are not worth
 # GPU time. What still pays is a new family that the blend can mix (a whole family was worth about +0.0004 on

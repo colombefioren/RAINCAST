@@ -1,5 +1,5 @@
-# Fifth molab session (24 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started with
-# build_molab.py. The fourth session and the Saturday Kaggle sessions confirmed the plateau: 14-epoch U-Net++
+# Fifth cloud session (24 October), built with build_kernel_queue.py --gpu --runs-per-gpu 3 and started with
+# build_cloud_job.py. The fourth session and the Saturday Kaggle sessions confirmed the plateau: 14-epoch U-Net++
 # 0.7097 to 0.7134, and every blend of 27 to 42 U-Net++ runs scores 0.7683 to 0.7686. More runs of the same model
 # no longer help, so this session trains U-Net++ runs that see different inputs, for diversity in the blend:
 # - a rain climatology (--clim 1): the training-split frequency of rain > 1 mm/h at each pixel for the hour of day

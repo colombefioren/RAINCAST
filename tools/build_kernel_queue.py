@@ -27,7 +27,7 @@ How the session runs:
 Usage: python tools/build_kernel_queue.py <kernel-slug> <runs-file> [budget-hours] [--gpu] [--runs-per-gpu N]
 (paths relative to the repository root; the kernel is written to kernel/<kernel-slug>/)
 The budget defaults to 7.75 hours on TPU and 10.75 hours on GPU. --runs-per-gpu N trains N runs side by side
-on each GPU (default 1), for a GPU much bigger than one run needs, such as molab's 96 GB (tools/build_molab.py).
+on each GPU (default 1), for a GPU much bigger than one run needs, such as the sandbox's 96 GB (tools/build_cloud_job.py).
 The runs file holds a "base:" line with the train_unet.py arguments every run shares, then one run per line
 (its own arguments, in priority order); # starts a comment. Push with -t 32400 for a TPU kernel (Kaggle's
 9-hour TPU limit) or -t 43200 for a GPU kernel (12 hours).
@@ -150,7 +150,7 @@ todo = list(range(len(RUNS)))  # runs not started yet, in priority order
 rate = {}                      # model -> seconds per unit of work, measured on finished runs
 procs, report, quick_failures, retried, trained_runs = {}, [], [], set(), set()
 trained_any, pinning_failed, stop = threading.Event(), threading.Event(), threading.Event()
-# a fresh session.json at once: molab reuses its machine between jobs, and the molab worker must not upload the
+# a fresh session.json at once: the sandbox reuses its machine between jobs, and the worker must not upload the
 # previous job's runs as this job's results
 json.dump(dict(seconds_per_epoch=rate, runs=report, not_started=[j + 1 for j in todo]), open(f"{WORK}/session.json", "w"), indent=1)
 

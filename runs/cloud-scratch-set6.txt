@@ -1,4 +1,4 @@
-# Sixth molab session (25 October): U-Net++ runs with the storm start and persistence climatology (--clim 2: the
+# Sixth cloud session (25 October): U-Net++ runs with the storm start and persistence climatology (--clim 2: the
 # --clim 1 frequency channels plus, per lead time and its hour of day, how often rain follows where a pixel is dry
 # or already wet at the forecast time). A pixel-sample logistic model on the training split gained about 1% in
 # Brier score on the validation season from these maps over the frequency climatology, more than the frequency

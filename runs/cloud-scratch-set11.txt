@@ -1,4 +1,4 @@
-# Eleventh molab session (overnight 26 to 27 October, relaunched when the tenth session's sandbox ends): the tenth session showed that regularisation does not move
+# Eleventh cloud session (overnight 26 to 27 October, relaunched when the tenth session's sandbox ends): the tenth session showed that regularisation does not move
 # a 14-epoch run (data-limited, not overfitting), so this session tests what changes the data, the loss or the inductive bias:
 # a zoom augmentation (--aug 3: translations plus a 0.85 to 1.15 zoom), an input-frame dropout, the soft CSI loss
 # (the tenth session's best single run, s1637 at 0.7139 with --csi_w 0.5: a confirmation pair and a pair at weight

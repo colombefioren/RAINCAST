@@ -98,7 +98,7 @@ assert a.full or val.any(), f"no samples in the {a.val_season} season"
 def advected():
     """Advected maps of the training and test samples. In a run queue (data unpacked to .npy files) the first run
     saves the training maps next to the data and every run memory-maps that file, so the runs that share a
-    machine hold one copy (2.1 GB) instead of one each, which matters with three runs in molab's 32 GB sandbox."""
+    machine hold one copy (2.1 GB) instead of one each, which matters with three runs in the cloud sandbox's 32 GB."""
     if not a.advect: return None, None
     cache = f"{a.data}/train_adv.npy"
     if a.limit or not os.path.exists(f"{a.data}/train_X.npy"): return advect_batch(X), advect_batch(Xt)

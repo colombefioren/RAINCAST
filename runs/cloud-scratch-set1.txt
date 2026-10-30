@@ -1,5 +1,5 @@
-# Training runs for molab's free RTX PRO 6000 Blackwell GPU (96 GB), three side by side, built with
-# build_kernel_queue.py --gpu --runs-per-gpu 3 and started with build_molab.py. The first twelve take over the
+# Training runs for the cloud sandbox's RTX PRO 6000 Blackwell GPU (96 GB), three side by side, built with
+# build_kernel_queue.py --gpu --runs-per-gpu 3 and started with build_cloud_job.py. The first twelve take over the
 # two Kaggle GPU sets planned for Saturday 24 October (same seeds), so those sessions can train new members;
 # two more pairs follow while the session lasts. Each validation run has a full-data twin.
 base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32

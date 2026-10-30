@@ -1,4 +1,4 @@
-# Rest of the third molab session (23 October, evening). The molab sandbox of indabax-molab-set3 stopped about
+# Rest of the third cloud session (23 October, evening). The cloud sandbox of indabax-cloud-set3 stopped about
 # three hours in, probably reclaimed while no browser tab was connected, after 14 of its 40 runs had finished and
 # uploaded (the four tests, s605 to s607 and their full-data twins s701 to s707). This queue holds the 26 runs it
 # did not finish, unchanged: validation and full-data pairs of U-Net and U-Net++ (seeds 608 to 620 and their

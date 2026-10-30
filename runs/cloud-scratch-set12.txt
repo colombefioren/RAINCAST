@@ -1,4 +1,4 @@
-# Twelfth molab session (Tuesday 27 October, relaunched when session 11b's sandbox ends at about 05:57). The soft
+# Twelfth cloud session (Tuesday 27 October, relaunched when session 11b's sandbox ends at about 05:57). The soft
 # CSI loss is the lever (plain recipe 0.7123 on average; weights 1.0 to 3.0 all average 0.7140 to 0.7146), but the
 # blend is saturated: the 17 CSI members trained so far add +0.00026 on validation over submission 37's 41 members,
 # a whole new model family is worth about +0.0004 and one more member of a known family about +0.00002. So this

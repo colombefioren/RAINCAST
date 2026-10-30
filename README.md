@@ -84,7 +84,7 @@ development.
 | `tools/build_kernel.sh` | Bundles the training code into one Kaggle kernel script. |
 | `tools/build_kernel_queue.py` | Turns a run list into one kernel that trains the runs side by side on GPUs or TPU chips. |
 | `tools/build_kernel_pair.py` | Two runs in one Kaggle kernel, one per GPU. |
-| `tools/build_molab.py` | Runs a run-queue kernel on molab (marimo's cloud notebooks) with results uploaded to a private Kaggle dataset. |
+| `tools/build_cloud_job.py` | Runs a run-queue kernel on a cloud GPU sandbox with results uploaded to a private Kaggle dataset. |
 | `tools/build_review_kernel.py` | Builds the code-review package: the Kaggle notebook that reproduces the final submission and the two datasets it reads (code, members' probability maps). |
 | `runs/` | The run lists of every training session, with the reason for each group of runs. |
 | `final/members.md` | The 58 members of the final submission: settings, sessions, scores. |
@@ -111,14 +111,14 @@ The Kaggle CLI reads its token from `~/.kaggle/access_token`.
    kernel script that trains its runs side by side within a time budget:
 
    ```bash
-   python tools/build_kernel_queue.py indabax-molab-set9 runs/molab-scratch-set9.txt 10.25 --gpu --runs-per-gpu 2
+   python tools/build_kernel_queue.py indabax-cloud-set9 runs/cloud-scratch-set9.txt 10.25 --gpu --runs-per-gpu 2
    ```
 
-   On Kaggle: `kaggle kernels push -p kernel/indabax-molab-set9 -t 43200`, then
-   `python src/fetch_runs.py cocofioren/indabax-molab-set9 outputs/molab-set9` once the session ends.
-   On molab: `python tools/build_molab.py indabax-molab-set9 indabax-molab-set9-results` publishes the job
+   On Kaggle: `kaggle kernels push -p kernel/indabax-cloud-set9 -t 43200`, then
+   `python src/fetch_runs.py cocofioren/indabax-cloud-set9 outputs/cloud-set9` once the session ends.
+   On the cloud sandbox: `python tools/build_cloud_job.py indabax-cloud-set9 indabax-cloud-set9-results` publishes the job
    to a private Kaggle dataset; the notebook it writes runs the job and uploads the compacted results, fetched
-   with `kaggle datasets download -d cocofioren/indabax-molab-set9-results -p outputs/molab-set9 --unzip`.
+   with `kaggle datasets download -d cocofioren/indabax-cloud-set9-results -p outputs/cloud-set9 --unzip`.
    A single run trains with `python src/train_unet.py <base line> <own settings>`.
 
 2. **Blend and fit the decoder** on the held-out season (from `src/`):

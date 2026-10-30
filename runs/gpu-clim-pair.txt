@@ -1,6 +1,6 @@
 # Second Kaggle GPU session beside indabax-gpu-clim-twins: the full-data twin of climatology run s1205, which lets
 # every climatology run so far enter a submission, and one more climatology validation run (s1206; its twin s1306
-# goes to the next molab session). The advection tests ended: neither advected maps nor advected maps with the
+# goes to the next cloud session). The advection tests ended: neither advected maps nor advected maps with the
 # climatology add to the blend. Fetch with: python src/fetch_runs.py cocofioren/indabax-gpu-clim-pair
 # outputs/gpu-clim-pair 6
 base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32
