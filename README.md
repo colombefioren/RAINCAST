@@ -63,7 +63,7 @@ Public leaderboard: 0.78384 (200 test samples, scored on a public subset).
 
 Each test sample is processed on its own from its three rain maps and its own timestamp; no external data,
 no pretrained weights, no look-up across samples. `docs/RULES.md` goes through the competition rules one by
-one and says how the code follows each, including the software used and the AI coding assistance during
+one and says how the code follows each, including the software used and the AI assistance during
 development.
 
 ## Layout

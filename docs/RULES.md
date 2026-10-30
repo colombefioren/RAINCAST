@@ -55,7 +55,7 @@ What this repository does about it:
 | scikit-learn | Isotonic calibration in the decoder | BSD-3-Clause |
 | Kaggle Notebooks, molab (marimo) | GPU sessions for training | service terms |
 | Kaggle API client | Data download, kernel runs, submissions | Apache-2.0 |
-| Claude Code (Anthropic) | AI coding assistant used during development; every script was reviewed and run by the participant | service terms |
+| Claude (Anthropic) | AI assistant used during development; every script was reviewed and run by the participant | service terms |
 
 ## References
 
