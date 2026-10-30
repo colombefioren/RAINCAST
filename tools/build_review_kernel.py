@@ -34,7 +34,7 @@ final = json.load(open("final/submission.json"))
 code_dir = "outputs/review/code"
 shutil.rmtree(code_dir, ignore_errors=True); os.makedirs(code_dir)
 subprocess.run(f"git archive HEAD | tar -x -C {code_dir}", shell=True, check=True)
-json.dump({"title": "INDABAX-RAINFALL code", "id": f"{OWNER}/{CODE}", "licenses": [{"name": "MIT"}]},
+json.dump({"title": "RAINCAST code", "id": f"{OWNER}/{CODE}", "licenses": [{"name": "MIT"}]},
           open(f"{code_dir}/dataset-metadata.json", "w"), indent=1)
 
 # 2. the members: compressed probability maps (written beforehand by outputs/scratch or by this script), index, submission
@@ -53,7 +53,7 @@ for m, t in zip(final["members"], twins):
 json.dump(index, open(f"{mem_dir}/index.json", "w"), indent=1)
 shutil.copy(SUBMITTED, f"{mem_dir}/submission.csv")
 shutil.copy("final/members.md", f"{mem_dir}/members.md")
-json.dump({"title": "INDABAX-RAINFALL members", "id": f"{OWNER}/{MEMBERS}", "licenses": [{"name": "CC0-1.0"}]},
+json.dump({"title": "RAINCAST members", "id": f"{OWNER}/{MEMBERS}", "licenses": [{"name": "CC0-1.0"}]},
           open(f"{mem_dir}/dataset-metadata.json", "w"), indent=1)
 
 # 3. the notebook
@@ -69,7 +69,7 @@ md = lambda s: {"cell_type": "markdown", "metadata": {}, "source": s.strip("\n")
 py = lambda s: {"cell_type": "code", "metadata": {}, "execution_count": None, "outputs": [], "source": s.strip("\n")}
 cells = [
 md(f"""
-# INDABAX-RAINFALL: reproduction of the final submission
+# RAINCAST: reproduction of the final submission
 
 Code review package for *Hackathon - IndabaX Madagascar 2026*, participant Coco Fioren. The final submission is a
 blend of 58 U-Net++ networks trained from random weights on the competition data only, calibrated and decoded into
