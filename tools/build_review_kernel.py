@@ -34,7 +34,14 @@ final = json.load(open("final/submission.json"))
 code_dir = "outputs/review/code"
 shutil.rmtree(code_dir, ignore_errors=True); os.makedirs(code_dir)
 subprocess.run(f"git archive HEAD | tar -x -C {code_dir}", shell=True, check=True)
-json.dump({"title": "RAINCAST code", "id": f"{OWNER}/{CODE}", "licenses": [{"name": "MIT"}]},
+json.dump({"title": "RAINCAST code", "id": f"{OWNER}/{CODE}", "licenses": [{"name": "MIT"}],
+           "subtitle": "Rainfall nowcasting from satellite rain maps: the RAINCAST repository",
+           "description": "The RAINCAST repository (https://github.com/colombefioren/RAINCAST) at the commit of the final "
+                          "submission: training (`src/train_unet.py`), blend and decoder (`src/blend.py`, `src/fss_decode.py`), "
+                          "submission step (`src/twins.py`, `src/make_submission.py`), the run list of every training session "
+                          "(`runs/`), the members of the final submission (`final/`), the design notes and the rules checklist "
+                          "(`docs/`). Read by the notebook `indabax-rainfall-reproduction`, which rebuilds the final submission "
+                          "from the saved probability maps of the dataset `indabax-rainfall-members`."},
           open(f"{code_dir}/dataset-metadata.json", "w"), indent=1)
 
 # 2. the members: compressed probability maps (written beforehand by outputs/scratch or by this script), index, submission
@@ -53,7 +60,16 @@ for m, t in zip(final["members"], twins):
 json.dump(index, open(f"{mem_dir}/index.json", "w"), indent=1)
 shutil.copy(SUBMITTED, f"{mem_dir}/submission.csv")
 shutil.copy("final/members.md", f"{mem_dir}/members.md")
-json.dump({"title": "RAINCAST members", "id": f"{OWNER}/{MEMBERS}", "licenses": [{"name": "CC0-1.0"}]},
+json.dump({"title": "RAINCAST members", "id": f"{OWNER}/{MEMBERS}", "licenses": [{"name": "CC0-1.0"}],
+           "subtitle": "Probability maps of the 58 networks behind the final RAINCAST forecast",
+           "description": "For each of the 58 members of the final submission: its validation probability map (mean of its "
+                          "last epochs on the held-out season, December 2022 to March 2023), its test probability map, and the "
+                          "test probability map of its full-data twin (same settings, seed + 100, trained on every season), as "
+                          "written by `src/train_unet.py` and compacted by `src/fetch_runs.py` of the RAINCAST repository "
+                          "(dataset `indabax-rainfall-code`). Files are `.npz` with one array `prob` (uint8 probability x 255 "
+                          "for validation maps, float16 for test maps). `index.json` lists the members, their twins, the blend "
+                          "weights and the decoder mu; `members.md` describes each member; `submission.csv` is the submitted "
+                          "file. The notebook `indabax-rainfall-reproduction` rebuilds the submission from these files."},
           open(f"{mem_dir}/dataset-metadata.json", "w"), indent=1)
 
 # 3. the notebook
