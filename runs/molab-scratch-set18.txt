@@ -1,0 +1,16 @@
+# Eighteenth session (Thursday 29 October, night, second sandbox after session 17 finished its six pairs at 20:20).
+# Six more member-and-twin pairs of the three strongest recipes (learning rate 2e-3; the base soft-CSI recipe;
+# CSI weight 3), six epochs kept as in the final members, for the last hours of the sandbox before the deadline.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--lr 2e-3 --seed 1871
+--lr 2e-3 --seed 1971 --full
+--seed 1872
+--seed 1972 --full
+--lr 2e-3 --seed 1873
+--lr 2e-3 --seed 1973 --full
+--csi_w 3.0 --seed 1874
+--csi_w 3.0 --seed 1974 --full
+--lr 2e-3 --seed 1875
+--lr 2e-3 --seed 1975 --full
+--seed 1876
+--seed 1976 --full

@@ -1,0 +1,35 @@
+# Fourteenth session (Thursday 29 October, the last one before the Friday deadline). No new family: thirteen sessions
+# showed the blend saturated, and every new setting tied or lost. This session only deepens the strongest recipes,
+# each run paired at once with its full-data twin (seed + 100), so that every finished pair can join the blend and
+# strengthen the test-side average: the learning rate 2e-3 members (0.7152, 0.7154, 0.7144), CSI weight 3 (0.7147,
+# 0.7145), the base CSI weight 1 (0.7150, 0.7147) and CSI weight 2 (0.7144, 0.7140). The strongest recipes come
+# first so that whatever the 12-hour sandbox finishes is the most useful part.
+base: --data /kaggle/input/competitions/hackathon-IndabaX-MDG-2026 --out /kaggle/working --threads 4 --save_each --keep_epochs 6 --tta 0 --lr 1e-3 --aug 2 --dropout 0.2 --bs 16 --upscale 3 --amp 1 --eval_bs 32 --arch UnetPlusPlus --encoder resnet34 --epochs 14 --clim 1 --clim_oof 1 --csi_w 1.0
+--lr 2e-3 --seed 1811
+--lr 2e-3 --seed 1911 --full
+--csi_w 3.0 --seed 1812
+--csi_w 3.0 --seed 1912 --full
+--lr 2e-3 --seed 1813
+--lr 2e-3 --seed 1913 --full
+--seed 1814
+--seed 1914 --full
+--lr 2e-3 --seed 1815
+--lr 2e-3 --seed 1915 --full
+--csi_w 3.0 --seed 1816
+--csi_w 3.0 --seed 1916 --full
+--csi_w 2.0 --seed 1817
+--csi_w 2.0 --seed 1917 --full
+--lr 2e-3 --seed 1818
+--lr 2e-3 --seed 1918 --full
+--seed 1819
+--seed 1919 --full
+--csi_w 3.0 --seed 1820
+--csi_w 3.0 --seed 1920 --full
+--lr 2e-3 --seed 1821
+--lr 2e-3 --seed 1921 --full
+--csi_w 2.0 --seed 1822
+--csi_w 2.0 --seed 1922 --full
+--seed 1823
+--seed 1923 --full
+--lr 2e-3 --seed 1824
+--lr 2e-3 --seed 1924 --full
